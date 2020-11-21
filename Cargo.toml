@@ -1,0 +1,14 @@
+[package]
+edition = "2018"
+publish = false
+name = "openkrosskod"
+version = "0.0.0"
+authors = ["Dmytro Meleshko <dmytro.meleshko@gmail.com>"]
+description = "openkrosskod"
+license = "MIT"
+repository = "https://github.com/dmitmel/openkrosskod.git"
+homepage = "https://github.com/dmitmel/openkrosskod"
+
+[dependencies]
+sdl2 = "*"
+gl = "*"
