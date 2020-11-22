@@ -42,16 +42,19 @@ fn main() {
   let sdl_context = sdl2::init().unwrap();
   let video_subsystem = sdl_context.video().unwrap();
 
-  let window_title = concat!(env!("CARGO_PKG_NAME"), " v", env!("CARGO_PKG_VERSION"));
-  let window =
-    video_subsystem.window(window_title, 800, 600).resizable().opengl().build().unwrap();
-
+  // NOTE: It is very important that GL context attributes are set **before**
+  // creating the window! For some reason not doing the initialization in this
+  // order on macOS causes ANGLE to not work.
   let gl_attr = video_subsystem.gl_attr();
   gl_attr.set_context_profile(GL_CONTEXT_PROFILE);
   gl_attr.set_context_version(GL_CONTEXT_VERSION.0, GL_CONTEXT_VERSION.1);
   // gl_attr.set_context_flags().debug().set();
   // gl_attr.set_multisample_buffers(1);
   // gl_attr.set_multisample_samples(4);
+
+  let window_title = concat!(env!("CARGO_PKG_NAME"), " v", env!("CARGO_PKG_VERSION"));
+  let window =
+    video_subsystem.window(window_title, 800, 600).resizable().opengl().build().unwrap();
 
   let gl_ctx = window.gl_create_context().unwrap();
   assert_eq!(gl_attr.context_profile(), GL_CONTEXT_PROFILE);
@@ -78,21 +81,6 @@ fn main() {
     getrandom::getrandom(&mut seed_bytes).unwrap();
     u128::from_le_bytes(seed_bytes)
   });
-
-  // let mut static_texture = oogl::Texture2D::new(Rc::clone(&gl));
-  // let static_data = {
-  //   let bound_texture = static_texture.bind(None);
-  //   bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
-  //   bound_texture.set_filters(oogl::TextureFilter::Linear, None);
-  //   let (w, h) = window.size();
-  //   bound_texture.reserve_data(
-  //     0,
-  //     oogl::TextureInputFormat::Luminance,
-  //     oogl::TextureInternalFormat::Luminance,
-  //     (w, h),
-  //   );
-  //   vec![0; w as usize * h as usize]
-  // };
 
   let window_size = {
     let (w, h) = window.size();
@@ -124,9 +112,6 @@ fn main() {
     gl: Rc::clone(&gl),
     renderer: Renderer::init(&gl),
     ball_texture,
-    //
-    // static_texture,
-    // static_data,
   };
 
   game.start_loop();
@@ -218,9 +203,6 @@ struct Game {
   pub gl: oogl::SharedContext,
   pub renderer: Renderer,
   pub ball_texture: oogl::Texture2D,
-  //
-  // pub static_texture: oogl::Texture2D,
-  // pub static_data: Vec<u8>,
 }
 
 impl Game {
@@ -273,12 +255,6 @@ impl Game {
           assert!(h > 0);
           self.globals.window_size = vec2(w as f32, h as f32);
           self.gl.set_viewport(0, 0, w, h);
-          // self.static_texture.bind(None).reserve_data(
-          //   0,
-          //   oogl::TextureInputFormat::Luminance,
-          //   oogl::TextureInternalFormat::Luminance,
-          //   (w as u32, h as u32),
-          // );
         }
 
         Event::MouseMotion { x, y, .. } => {
@@ -376,30 +352,6 @@ impl Game {
       rotation: self.state.ball.rotation,
       fill: ShapeFill::Texture(self.ball_texture.bind(None)),
     });
-
-    // {
-    //   let bound_texture = self.static_texture.bind(None);
-
-    //   for pixel in &mut self.static_data {
-    //     *pixel = self.rng.rand_u64() as u8;
-    //   }
-
-    //   bound_texture.set_sub_data(
-    //     0,
-    //     oogl::TextureInputFormat::Luminance,
-    //     (0, 0),
-    //     self.window.size(),
-    //     &self.static_data,
-    //   );
-
-    //   self.renderer.draw_shape(Shape {
-    //     type_: ShapeType::Rectangle,
-    //     pos: vec2n(0.0),
-    //     size: window_size,
-    //     rotation: 0.0,
-    //     fill: ShapeFill::Texture(bound_texture),
-    //   });
-    // }
   }
 }
 
