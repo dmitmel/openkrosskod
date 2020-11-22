@@ -243,6 +243,8 @@ macro_rules! impl_vec2 {
 
       #[inline]
       pub fn angle(self) -> $ty { self.y.atan2(self.x) }
+
+      // TODO: Add more rotation- and angle-related functions
     }
   };
 }

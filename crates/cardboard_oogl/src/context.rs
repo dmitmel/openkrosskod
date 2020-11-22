@@ -61,6 +61,8 @@ impl Context {
   pub fn active_texture_unit(&self) -> u32 { self.active_texture_unit.get() }
 
   pub fn clear_color(&self, color: Colorf) {
+    // TODO: Separate the Clear call into its own function, use the bitflags
+    // crate for specifying which buffers to clear.
     unsafe {
       self.raw_gl.ClearColor(color.r, color.g, color.b, color.a);
       self.raw_gl.Clear(gl::COLOR_BUFFER_BIT);
@@ -97,7 +99,7 @@ impl Context {
   }
 }
 
-// TODO: Perhaps implement this properly later?
+// TODO: Implement Debug properly with wrappers for non-debuggable stuff
 impl fmt::Debug for Context {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "Context#<{:p}>", unsafe { self.sdl_gl_context.raw() })

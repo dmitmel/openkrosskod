@@ -460,6 +460,8 @@ impl Game {
 
     // dbg!(left_racket.coll.vel, right_racket.coll.vel);
 
+    // TODO: Rewrite the collision handling system. The current one leaves a lot
+    // to be desired.
     for racket in &mut [&mut *left_racket, &mut *right_racket] {
       // <https://gamedev.stackexchange.com/q/136073/145058>
       let racket_extents = racket.coll.extents();
