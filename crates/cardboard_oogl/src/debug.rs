@@ -45,13 +45,13 @@ gl_enum!({
 });
 
 extern "system" fn internal_debug_message_callback(
-  source: GLenum,
-  type_: GLenum,
-  id: GLuint,
-  severity: GLenum,
-  length: GLsizei,
-  message: *const GLchar,
-  _user_param: *mut GLvoid,
+  source: u32,
+  type_: u32,
+  id: u32,
+  severity: u32,
+  length: i32,
+  message: *const i8,
+  _user_param: *mut c_void,
 ) {
   fn enum_to_string<T: fmt::Debug>(opt: Option<T>) -> String {
     match opt {
@@ -74,46 +74,36 @@ extern "system" fn internal_debug_message_callback(
 
 pub(crate) unsafe fn set_object_debug_label(
   ctx: &Context,
-  type_identifier: GLenum,
-  addr: GLuint,
+  type_identifier: u32,
+  addr: u32,
   label: &[u8],
 ) {
   let gl = ctx.raw_gl();
   if gl.ObjectLabel.is_loaded() {
-    assert!(label.len() <= ctx.capabilities().max_debug_object_label_len as usize);
+    let label_len = i32::try_from(label.len()).unwrap();
+    assert!(label_len <= ctx.capabilities().max_debug_object_label_len);
 
     // TODO: Check that the label doesn't contain any NUL characters
 
-    gl.ObjectLabel(
-      type_identifier,
-      addr,
-      GLsizei::try_from(label.len()).unwrap(),
-      label.as_ptr() as *const GLchar,
-    );
+    gl.ObjectLabel(type_identifier, addr, label_len, label.as_ptr() as *const i8);
   }
 }
 
 pub(crate) unsafe fn get_object_debug_label(
   ctx: &Context,
-  type_identifier: GLenum,
-  addr: GLuint,
+  type_identifier: u32,
+  addr: u32,
 ) -> Vec<u8> {
   let gl = ctx.raw_gl();
   if gl.GetObjectLabel.is_loaded() {
     let buf_size =
         // The buffer will contain a NUL-terminated string, so reserve one more
         // byte for the final NUL character.
-        GLsizei::try_from(ctx.capabilities().max_debug_object_label_len + 1).unwrap();
+        ctx.capabilities().max_debug_object_label_len.checked_add(1).unwrap();
     let mut buf: Vec<u8> = Vec::with_capacity(buf_size as usize);
-    let mut text_len: GLint = 0;
+    let mut text_len: i32 = 0;
 
-    gl.GetObjectLabel(
-      type_identifier,
-      addr,
-      buf_size,
-      &mut text_len,
-      buf.as_mut_ptr() as *mut GLchar,
-    );
+    gl.GetObjectLabel(type_identifier, addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut i8);
     buf.set_len(text_len as usize);
 
     buf

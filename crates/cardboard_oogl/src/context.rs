@@ -34,7 +34,7 @@ impl Context {
     video_subsystem: &sdl2::VideoSubsystem,
     sdl_gl_context: sdl2::video::GLContext,
   ) -> Self {
-    let gl = Gles2::load_with(|name| video_subsystem.gl_get_proc_address(name) as *const GLvoid);
+    let gl = Gles2::load_with(|name| video_subsystem.gl_get_proc_address(name) as *const c_void);
 
     // This has to be done first!!!
     crate::debug::init(&gl);
@@ -73,7 +73,7 @@ impl Context {
     unsafe { self.raw_gl.Viewport(pos.x, pos.y, size.x, size.y) };
   }
 
-  unsafe fn set_feature_enabled(&self, feature: GLenum, enabled: bool) {
+  unsafe fn set_feature_enabled(&self, feature: u32, enabled: bool) {
     if enabled {
       self.raw_gl.Enable(feature);
     } else {
@@ -108,7 +108,7 @@ impl fmt::Debug for Context {
 
 #[derive(Debug)]
 pub(crate) struct BindingTarget<T> {
-  target: GLenum,
+  target: u32,
   bound_addr: Cell<u32>,
   phantom: PhantomData<*mut T>,
 }
@@ -118,7 +118,7 @@ impl<T> BindingTarget<T> {
   #[inline(always)]
   #[allow(dead_code)]
   pub(crate) fn is_anything_bound(&self) -> bool { self.bound_addr() != 0 }
-  pub(crate) fn new(target: GLenum) -> Self {
+  pub(crate) fn new(target: u32) -> Self {
     Self { target, bound_addr: Cell::new(0), phantom: PhantomData }
   }
 }
@@ -175,30 +175,30 @@ pub struct ContextCapabilities {
   pub max_texture_units: u32,
   pub max_texture_size: u32,
 
-  pub max_debug_object_label_len: u32,
+  pub max_debug_object_label_len: i32,
 }
 
 impl ContextCapabilities {
   pub fn load(gl: &RawGL) -> Self {
-    fn get_bool_1(gl: &RawGL, name: GLenum) -> GLboolean {
+    fn get_bool_1(gl: &RawGL, name: u32) -> u8 {
       let mut value = 0;
       unsafe { gl.GetBooleanv(name, &mut value) }
       value
     }
 
-    fn get_int_1(gl: &RawGL, name: GLenum) -> GLint {
+    fn get_i32_1(gl: &RawGL, name: u32) -> i32 {
       let mut value = 0;
       unsafe { gl.GetIntegerv(name, &mut value) }
       value
     }
 
     #[inline(always)]
-    fn get_uint_1(gl: &RawGL, name: GLenum) -> GLuint { get_int_1(gl, name) as _ }
+    fn get_u32_1(gl: &RawGL, name: u32) -> u32 { get_i32_1(gl, name) as _ }
 
-    fn get_string(gl: &RawGL, name: GLenum) -> String {
-      let ptr: *const GLubyte = unsafe { gl.GetString(name) };
+    fn get_string(gl: &RawGL, name: u32) -> String {
+      let ptr: *const u8 = unsafe { gl.GetString(name) };
       assert!(!ptr.is_null());
-      let c_str = unsafe { CStr::from_ptr(ptr as *const c_char) };
+      let c_str = unsafe { CStr::from_ptr(ptr as *const i8) };
       String::from_utf8(c_str.to_bytes().to_vec()).expect("GetString returned a non-UTF8 string")
     }
 
@@ -251,11 +251,11 @@ impl ContextCapabilities {
       glsl_version,
       extensions,
 
-      max_texture_units: get_uint_1(gl, gl::MAX_COMBINED_TEXTURE_IMAGE_UNITS),
-      max_texture_size: get_uint_1(gl, gl::MAX_TEXTURE_SIZE),
+      max_texture_units: get_u32_1(gl, gl::MAX_COMBINED_TEXTURE_IMAGE_UNITS),
+      max_texture_size: get_u32_1(gl, gl::MAX_TEXTURE_SIZE),
 
       max_debug_object_label_len: if gl.ObjectLabel.is_loaded() {
-        get_uint_1(gl, gl::MAX_LABEL_LENGTH)
+        get_i32_1(gl, gl::MAX_LABEL_LENGTH)
       } else {
         0
       },

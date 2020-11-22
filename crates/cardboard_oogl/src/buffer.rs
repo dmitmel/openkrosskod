@@ -22,7 +22,7 @@ impl<T> !Send for VertexBuffer<T> {}
 impl<T> !Sync for VertexBuffer<T> {}
 
 impl<T> Object for VertexBuffer<T> {
-  const DEBUG_TYPE_IDENTIFIER: GLenum = gl::BUFFER;
+  const DEBUG_TYPE_IDENTIFIER: u32 = gl::BUFFER;
 
   #[inline(always)]
   fn ctx(&self) -> &SharedContext { &self.ctx }
@@ -102,15 +102,15 @@ impl<'obj, T> VertexBufferBinding<'obj, T> {
         unsafe {
           gl.VertexAttribPointer(
             attrib.location as u32,
-            attrib.config.len as GLint,
+            attrib.config.len as i32,
             attrib.config.type_.as_raw(),
-            attrib.config.normalize as GLboolean,
-            stride as GLsizei,
-            offset as *const GLvoid,
+            attrib.config.normalize as u8,
+            stride as i32,
+            offset as *const c_void,
           )
         };
       }
-      offset += attrib.size as GLsizeiptr;
+      offset += attrib.size as isize;
     }
   }
 
@@ -144,11 +144,7 @@ impl<'obj, T> VertexBufferBinding<'obj, T> {
   ) {
     let gl = self.ctx().raw_gl();
     unsafe {
-      gl.DrawArrays(
-        mode.as_raw(),
-        GLint::try_from(start).unwrap(),
-        GLint::try_from(count).unwrap(),
-      )
+      gl.DrawArrays(mode.as_raw(), i32::try_from(start).unwrap(), i32::try_from(count).unwrap())
     };
   }
 }
@@ -165,7 +161,7 @@ impl<T: ElementBufferType> !Send for ElementBuffer<T> {}
 impl<T: ElementBufferType> !Sync for ElementBuffer<T> {}
 
 impl<T: ElementBufferType> Object for ElementBuffer<T> {
-  const DEBUG_TYPE_IDENTIFIER: GLenum = gl::BUFFER;
+  const DEBUG_TYPE_IDENTIFIER: u32 = gl::BUFFER;
 
   #[inline(always)]
   fn ctx(&self) -> &SharedContext { &self.ctx }
@@ -233,9 +229,9 @@ impl<'obj, T: ElementBufferType> ElementBufferBinding<'obj, T> {
     unsafe {
       gl.DrawElements(
         mode.as_raw(),
-        GLint::try_from(count).unwrap(),
+        i32::try_from(count).unwrap(),
         T::GL_DRAW_ELEMENTS_DATA_TYPE.as_raw(),
-        (start as usize * mem::size_of::<T>()) as *const GLvoid,
+        (start as usize * mem::size_of::<T>()) as *const c_void,
       )
     };
   }
@@ -288,8 +284,8 @@ unsafe fn set_buffer_data<T>(
 ) {
   ctx.raw_gl().BufferData(
     target.as_raw(),
-    GLsizeiptr::try_from(data.len() * mem::size_of::<T>()).unwrap(),
-    data.as_ptr() as *const GLvoid,
+    isize::try_from(data.len() * mem::size_of::<T>()).unwrap(),
+    data.as_ptr() as *const c_void,
     usage_hint.as_raw(),
   );
 }

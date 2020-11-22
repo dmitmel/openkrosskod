@@ -3,7 +3,7 @@ use crate::impl_prelude::*;
 use prelude_plus::*;
 
 pub trait Object {
-  const DEBUG_TYPE_IDENTIFIER: GLenum;
+  const DEBUG_TYPE_IDENTIFIER: u32;
 
   fn ctx(&self) -> &SharedContext;
   fn addr(&self) -> u32;

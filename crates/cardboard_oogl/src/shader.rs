@@ -20,7 +20,7 @@ impl !Send for Shader {}
 impl !Sync for Shader {}
 
 impl Object for Shader {
-  const DEBUG_TYPE_IDENTIFIER: GLenum = gl::SHADER;
+  const DEBUG_TYPE_IDENTIFIER: u32 = gl::SHADER;
 
   #[inline(always)]
   fn ctx(&self) -> &SharedContext { &self.ctx }
@@ -50,22 +50,22 @@ impl Shader {
     let gl = self.raw_gl();
 
     unsafe { gl.CompileShader(self.addr) };
-    let mut status = gl::FALSE as GLint;
+    let mut status = gl::FALSE as i32;
     unsafe { gl.GetShaderiv(self.addr, gl::COMPILE_STATUS, &mut status) };
-    status == gl::TRUE as GLint
+    status == gl::TRUE as i32
   }
 
   pub fn get_info_log(&self) -> Vec<u8> {
     let gl = self.raw_gl();
 
-    let mut buf_size = 0 as GLint;
+    let mut buf_size: i32 = 0;
     unsafe { gl.GetShaderiv(self.addr, gl::INFO_LOG_LENGTH, &mut buf_size) };
     let mut buf: Vec<u8> = Vec::with_capacity(buf_size as usize);
 
     if buf_size != 0 {
-      let mut text_len = 0 as GLint;
+      let mut text_len: i32 = 0;
       unsafe {
-        gl.GetShaderInfoLog(self.addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut GLchar);
+        gl.GetShaderInfoLog(self.addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut i8);
         buf.set_len(text_len as usize);
       }
     }
@@ -94,7 +94,7 @@ pub const INACTIVE_UNIFORM_LOCATION: i32 = -1;
 pub const INACTIVE_ATTRIBUTE_LOCATION: u32 = -1i32 as u32;
 
 impl Object for Program {
-  const DEBUG_TYPE_IDENTIFIER: GLenum = gl::PROGRAM;
+  const DEBUG_TYPE_IDENTIFIER: u32 = gl::PROGRAM;
 
   #[inline(always)]
   fn ctx(&self) -> &SharedContext { &self.ctx }
@@ -127,22 +127,22 @@ impl Program {
     let gl = self.raw_gl();
 
     unsafe { gl.LinkProgram(self.addr) };
-    let mut status = gl::FALSE as GLint;
+    let mut status = gl::FALSE as i32;
     unsafe { gl.GetProgramiv(self.addr, gl::LINK_STATUS, &mut status) };
-    status == gl::TRUE as GLint
+    status == gl::TRUE as i32
   }
 
   pub fn get_info_log(&self) -> Vec<u8> {
     let gl = self.raw_gl();
 
-    let mut buf_size = 0 as GLint;
+    let mut buf_size: i32 = 0;
     unsafe { gl.GetProgramiv(self.addr, gl::INFO_LOG_LENGTH, &mut buf_size) };
     let mut buf: Vec<u8> = Vec::with_capacity(buf_size as usize);
 
     if buf_size != 0 {
-      let mut text_len = 0 as GLint;
+      let mut text_len: i32 = 0;
       unsafe {
-        gl.GetProgramInfoLog(self.addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut GLchar);
+        gl.GetProgramInfoLog(self.addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut i8);
         buf.set_len(text_len as usize);
       }
     }

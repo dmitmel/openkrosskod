@@ -20,7 +20,7 @@ impl !Send for Texture2D {}
 impl !Sync for Texture2D {}
 
 impl Object for Texture2D {
-  const DEBUG_TYPE_IDENTIFIER: GLenum = gl::TEXTURE;
+  const DEBUG_TYPE_IDENTIFIER: u32 = gl::TEXTURE;
 
   #[inline(always)]
   fn ctx(&self) -> &SharedContext { &self.ctx }
@@ -51,7 +51,7 @@ impl Texture2D {
       let gl = self.ctx.raw_gl();
 
       if different_unit_was_selected {
-        unsafe { gl.ActiveTexture(gl::TEXTURE0 + unit as GLenum) };
+        unsafe { gl.ActiveTexture(gl::TEXTURE0 + unit as u32) };
         self.ctx.active_texture_unit.set(unit);
       }
 
@@ -93,8 +93,8 @@ impl<'obj> Texture2DBinding<'obj> {
     let gl = self.raw_gl();
     let gl_target = Self::BIND_TARGET.as_raw();
     unsafe {
-      gl.TexParameteri(gl_target, gl::TEXTURE_WRAP_S, mode_s.as_raw() as GLint);
-      gl.TexParameteri(gl_target, gl::TEXTURE_WRAP_T, mode_t.as_raw() as GLint);
+      gl.TexParameteri(gl_target, gl::TEXTURE_WRAP_S, mode_s.as_raw() as i32);
+      gl.TexParameteri(gl_target, gl::TEXTURE_WRAP_T, mode_t.as_raw() as i32);
     }
   }
 
@@ -115,13 +115,13 @@ impl<'obj> Texture2DBinding<'obj> {
       (Linear, Some(Linear)) => gl::LINEAR_MIPMAP_LINEAR,
     };
 
-    unsafe { gl.TexParameteri(gl_target, gl::TEXTURE_MIN_FILTER, gl_enum as GLint) };
+    unsafe { gl.TexParameteri(gl_target, gl::TEXTURE_MIN_FILTER, gl_enum as i32) };
   }
 
   pub fn set_magnifying_filter(&self, filter: TextureFilter) {
     let gl = self.raw_gl();
     let gl_target = Self::BIND_TARGET.as_raw();
-    unsafe { gl.TexParameteri(gl_target, gl::TEXTURE_MAG_FILTER, filter.as_raw() as GLint) };
+    unsafe { gl.TexParameteri(gl_target, gl::TEXTURE_MAG_FILTER, filter.as_raw() as i32) };
   }
 
   pub fn set_filters(&self, filter: TextureFilter, mipmap_filter: Option<TextureFilter>) {
@@ -175,15 +175,15 @@ impl<'obj> Texture2DBinding<'obj> {
     format: TextureInputFormat,
     internal_format: TextureInternalFormat,
     size: Vec2<u32>,
-    data_ptr: *const GLvoid,
+    data_ptr: *const c_void,
   ) {
     unsafe {
       self.ctx().raw_gl().TexImage2D(
         Self::BIND_TARGET.as_raw(),
-        GLint::try_from(level_of_detail).unwrap(),
-        internal_format.as_raw() as GLint,
-        GLint::try_from(size.x).unwrap(),
-        GLint::try_from(size.y).unwrap(),
+        i32::try_from(level_of_detail).unwrap(),
+        internal_format.as_raw() as i32,
+        i32::try_from(size.x).unwrap(),
+        i32::try_from(size.y).unwrap(),
         0, // border, must be zero
         format.as_raw(),
         TextureInputDataType::U8.as_raw(),
@@ -205,11 +205,11 @@ impl<'obj> Texture2DBinding<'obj> {
     unsafe {
       self.ctx().raw_gl().TexSubImage2D(
         Self::BIND_TARGET.as_raw(),
-        GLint::try_from(level_of_detail).unwrap(),
-        GLint::try_from(offset.x).unwrap(),
-        GLint::try_from(offset.y).unwrap(),
-        GLint::try_from(size.x).unwrap(),
-        GLint::try_from(size.y).unwrap(),
+        i32::try_from(level_of_detail).unwrap(),
+        i32::try_from(offset.x).unwrap(),
+        i32::try_from(offset.y).unwrap(),
+        i32::try_from(size.x).unwrap(),
+        i32::try_from(size.y).unwrap(),
         format.as_raw(),
         TextureInputDataType::U8.as_raw(),
         data.as_ptr() as *const _,

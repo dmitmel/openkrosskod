@@ -1,5 +1,4 @@
 pub use gl;
-pub use gl::types::*;
 pub use gl::Gles2;
 
 pub use crate::context::{Context, RawGL, SharedContext};
