@@ -1,0 +1,3 @@
+[build]
+# to compile with the `simd_json` feature:
+# rustflags = ["-C", "target-cpu=native"]

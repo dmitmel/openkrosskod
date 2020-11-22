@@ -10,4 +10,4 @@ edition = "2018"
 gl_generator = "0.14.0"
 
 [features]
-gl_debug_all_commands = []
+debug_all_commands = []

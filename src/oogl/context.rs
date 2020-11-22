@@ -1,6 +1,4 @@
-use super::{
-  debug, BindBufferTarget, BindFramebufferTarget, BindProgramTarget, BindTextureTarget,
-};
+use super::debug;
 use crate::math::*;
 use ::gl::prelude::*;
 use prelude_plus::*;
@@ -14,12 +12,12 @@ pub struct Context {
   sdl_gl_context: sdl2::video::GLContext,
   capabilities: ContextCapabilities,
 
-  pub(super) bound_program: BindingTargetState<BindProgramTarget>,
-  pub(super) bound_vertex_buffer: BindingTargetState<BindBufferTarget>,
-  pub(super) bound_element_buffer: BindingTargetState<BindBufferTarget>,
+  pub(super) bound_program: BindingTarget<ProgramBindingTarget>,
+  pub(super) bound_vertex_buffer: BindingTarget<BufferBindingTarget>,
+  pub(super) bound_element_buffer: BindingTarget<BufferBindingTarget>,
   pub(super) active_texture_unit: Cell<u32>,
-  pub(super) bound_texture_2d: BindingTargetState<BindTextureTarget>,
-  pub(super) bound_framebuffer: BindingTargetState<BindFramebufferTarget>,
+  pub(super) bound_texture_2d: BindingTarget<TextureBindingTarget>,
+  pub(super) bound_framebuffer: BindingTarget<FramebufferBindingTarget>,
 }
 
 impl !Send for Context {}
@@ -53,12 +51,14 @@ impl Context {
       sdl_gl_context,
       capabilities,
 
-      bound_program: BindingTargetState::new(super::Program::BIND_TARGET),
-      bound_vertex_buffer: BindingTargetState::new(super::VertexBuffer::<()>::BIND_TARGET),
-      bound_element_buffer: BindingTargetState::new(super::ElementBuffer::<u8>::BIND_TARGET),
+      // programs are a special case, the binding target value doesn't matter
+      // because there is no such thing as binding a program to a target
+      bound_program: BindingTarget::new(gl::NONE),
+      bound_vertex_buffer: BindingTarget::new(super::BindBufferTarget::Vertex.as_raw()),
+      bound_element_buffer: BindingTarget::new(super::BindBufferTarget::Element.as_raw()),
       active_texture_unit: Cell::new(0),
-      bound_texture_2d: BindingTargetState::new(super::Texture2D::BIND_TARGET),
-      bound_framebuffer: BindingTargetState::new(super::Framebuffer::BIND_TARGET),
+      bound_texture_2d: BindingTarget::new(super::BindTextureTarget::Texture2D.as_raw()),
+      bound_framebuffer: BindingTarget::new(super::BindFramebufferTarget::Default.as_raw()),
     }
   }
 
@@ -94,31 +94,35 @@ impl fmt::Debug for Context {
 }
 
 #[derive(Debug)]
-pub(super) struct BindingTargetState<T> {
-  target: T,
+pub(super) struct BindingTarget<T> {
+  target: GLenum,
   bound_addr: Cell<u32>,
+  phantom: PhantomData<*mut T>,
 }
-impl<T> BindingTargetState<T> {
+impl<T> BindingTarget<T> {
   pub(super) fn bound_addr(&self) -> u32 { self.bound_addr.get() }
   #[allow(dead_code)]
   pub(super) fn is_anything_bound(&self) -> bool { self.bound_addr.get() != 0 }
-  pub(super) fn new(target: T) -> Self { Self { target, bound_addr: Cell::new(0) } }
+  pub(super) fn new(target: GLenum) -> Self {
+    Self { target, bound_addr: Cell::new(0), phantom: PhantomData }
+  }
 }
 
 macro_rules! impl_binding_target_state {
-  ($target_enum:ty $(: $target_to_raw_fn:ident)? , $gl_bind_fn:ident) => {
+  ($target_enum:ident, $gl_bind_fn:ident ($($target:ident)?)) => {
+    pub(super) enum $target_enum {}
+
     #[allow(dead_code)]
-    impl BindingTargetState<$target_enum> {
+    impl BindingTarget<$target_enum> {
       #[inline(always)]
       pub(super) fn bind_unconditionally(&self, gl: &RawGL, addr: u32) {
-        unsafe { gl.$gl_bind_fn($(self.target.$target_to_raw_fn(),)? addr) };
+        unsafe { gl.$gl_bind_fn($(self.$target, )? addr) };
         self.bound_addr.set(addr);
       }
 
       #[inline(always)]
       pub(super) fn unbind_unconditionally(&self, gl: &RawGL) {
-        unsafe { gl.$gl_bind_fn($(self.target.$target_to_raw_fn(),)? 0) };
-        self.bound_addr.set(0);
+        self.bind_unconditionally(gl, 0)
       }
 
       #[inline(always)]
@@ -131,10 +135,10 @@ macro_rules! impl_binding_target_state {
   };
 }
 
-impl_binding_target_state!(BindProgramTarget, UseProgram);
-impl_binding_target_state!(BindBufferTarget: as_raw, BindBuffer);
-impl_binding_target_state!(BindTextureTarget: as_raw, BindTexture);
-impl_binding_target_state!(BindFramebufferTarget: as_raw, BindFramebuffer);
+impl_binding_target_state!(ProgramBindingTarget, UseProgram());
+impl_binding_target_state!(BufferBindingTarget, BindBuffer(target));
+impl_binding_target_state!(TextureBindingTarget, BindTexture(target));
+impl_binding_target_state!(FramebufferBindingTarget, BindFramebuffer(target));
 
 // #[derive(Debug)]
 // pub struct BindingContext<T> {

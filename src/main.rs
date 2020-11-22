@@ -1,6 +1,6 @@
 #![forbid(missing_debug_implementations)]
 #![allow(clippy::new_without_default, clippy::missing_safety_doc)]
-#![feature(negative_impls, const_fn)]
+#![feature(negative_impls, const_fn, test)]
 
 pub mod gen_idx;
 pub mod image_decoding_speedrun;
@@ -79,6 +79,21 @@ fn main() {
     u128::from_le_bytes(seed_bytes)
   });
 
+  // let mut static_texture = oogl::Texture2D::new(Rc::clone(&gl));
+  // let static_data = {
+  //   let bound_texture = static_texture.bind(None);
+  //   bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
+  //   bound_texture.set_filters(oogl::TextureFilter::Linear, None);
+  //   let (w, h) = window.size();
+  //   bound_texture.reserve_data(
+  //     0,
+  //     oogl::TextureInputFormat::Luminance,
+  //     oogl::TextureInternalFormat::Luminance,
+  //     (w, h),
+  //   );
+  //   vec![0; w as usize * h as usize]
+  // };
+
   let window_size = {
     let (w, h) = window.size();
     vec2(w as f32, h as f32)
@@ -109,6 +124,9 @@ fn main() {
     gl: Rc::clone(&gl),
     renderer: Renderer::init(&gl),
     ball_texture,
+    //
+    // static_texture,
+    // static_data,
   };
 
   game.start_loop();
@@ -200,6 +218,9 @@ struct Game {
   pub gl: oogl::SharedContext,
   pub renderer: Renderer,
   pub ball_texture: oogl::Texture2D,
+  //
+  // pub static_texture: oogl::Texture2D,
+  // pub static_data: Vec<u8>,
 }
 
 impl Game {
@@ -252,6 +273,12 @@ impl Game {
           assert!(h > 0);
           self.globals.window_size = vec2(w as f32, h as f32);
           self.gl.set_viewport(0, 0, w, h);
+          // self.static_texture.bind(None).reserve_data(
+          //   0,
+          //   oogl::TextureInputFormat::Luminance,
+          //   oogl::TextureInternalFormat::Luminance,
+          //   (w as u32, h as u32),
+          // );
         }
 
         Event::MouseMotion { x, y, .. } => {
@@ -349,6 +376,30 @@ impl Game {
       rotation: self.state.ball.rotation,
       fill: ShapeFill::Texture(self.ball_texture.bind(None)),
     });
+
+    // {
+    //   let bound_texture = self.static_texture.bind(None);
+
+    //   for pixel in &mut self.static_data {
+    //     *pixel = self.rng.rand_u64() as u8;
+    //   }
+
+    //   bound_texture.set_sub_data(
+    //     0,
+    //     oogl::TextureInputFormat::Luminance,
+    //     (0, 0),
+    //     self.window.size(),
+    //     &self.static_data,
+    //   );
+
+    //   self.renderer.draw_shape(Shape {
+    //     type_: ShapeType::Rectangle,
+    //     pos: vec2n(0.0),
+    //     size: window_size,
+    //     rotation: 0.0,
+    //     fill: ShapeFill::Texture(bound_texture),
+    //   });
+    // }
   }
 }
 

@@ -10,7 +10,7 @@ fn main() {
   let registry =
     Registry::new(Api::Gles2, (2, 0), Profile::Core, Fallbacks::All, ["GL_KHR_debug"]);
 
-  if cfg!(feature = "gl_debug_all_commands") {
+  if cfg!(feature = "debug_all_commands") {
     registry.write_bindings(DebugStructGenerator, &mut file)
   } else {
     registry.write_bindings(StructGenerator, &mut file)

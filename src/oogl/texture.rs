@@ -132,15 +132,13 @@ impl<'tex> Texture2DBinding<'tex> {
     assert!(height <= max_size);
     assert_eq!(data.len(), width as usize * height as usize * format.color_components() as usize);
 
-    unsafe {
-      self.set_data_internal(
-        level_of_detail,
-        format,
-        internal_format,
-        size,
-        data.as_ptr() as *const _,
-      );
-    }
+    self.set_data_internal(
+      level_of_detail,
+      format,
+      internal_format,
+      size,
+      data.as_ptr() as *const _,
+    );
   }
 
   pub fn reserve_data(
@@ -157,10 +155,10 @@ impl<'tex> Texture2DBinding<'tex> {
     assert!(width <= max_size);
     assert!(height <= max_size);
 
-    unsafe { self.set_data_internal(level_of_detail, format, internal_format, size, ptr::null()) };
+    self.set_data_internal(level_of_detail, format, internal_format, size, ptr::null());
   }
 
-  unsafe fn set_data_internal(
+  fn set_data_internal(
     &self,
     level_of_detail: u32,
     format: TextureInputFormat,
@@ -168,17 +166,44 @@ impl<'tex> Texture2DBinding<'tex> {
     (width, height): (u32, u32),
     data_ptr: *const GLvoid,
   ) {
-    self.ctx().raw_gl().TexImage2D(
-      Self::BIND_TARGET.as_raw(),
-      GLint::try_from(level_of_detail).unwrap(),
-      internal_format.as_raw() as GLint,
-      GLint::try_from(width).unwrap(),
-      GLint::try_from(height).unwrap(),
-      0, // border, must be zero
-      format.as_raw(),
-      TextureInputDataType::U8.as_raw(),
-      data_ptr,
-    );
+    unsafe {
+      self.ctx().raw_gl().TexImage2D(
+        Self::BIND_TARGET.as_raw(),
+        GLint::try_from(level_of_detail).unwrap(),
+        internal_format.as_raw() as GLint,
+        GLint::try_from(width).unwrap(),
+        GLint::try_from(height).unwrap(),
+        0, // border, must be zero
+        format.as_raw(),
+        TextureInputDataType::U8.as_raw(),
+        data_ptr,
+      );
+    }
+  }
+
+  pub fn set_sub_data(
+    &self,
+    level_of_detail: u32,
+    format: TextureInputFormat,
+    (x_offset, y_offset): (u32, u32),
+    (width, height): (u32, u32),
+    data: &[u8],
+  ) {
+    assert_eq!(data.len(), width as usize * height as usize * format.color_components() as usize);
+
+    unsafe {
+      self.ctx().raw_gl().TexSubImage2D(
+        Self::BIND_TARGET.as_raw(),
+        GLint::try_from(level_of_detail).unwrap(),
+        GLint::try_from(x_offset).unwrap(),
+        GLint::try_from(y_offset).unwrap(),
+        GLint::try_from(width).unwrap(),
+        GLint::try_from(height).unwrap(),
+        format.as_raw(),
+        TextureInputDataType::U8.as_raw(),
+        data.as_ptr() as *const _,
+      );
+    }
   }
 }
 

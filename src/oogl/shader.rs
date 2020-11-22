@@ -83,8 +83,6 @@ pub const INACTIVE_UNIFORM_LOCATION: i32 = -1;
 pub const INACTIVE_ATTRIBUTE_LOCATION: u32 = -1i32 as u32;
 
 impl Program {
-  pub const BIND_TARGET: BindProgramTarget = BindProgramTarget::Default;
-
   pub fn ctx(&self) -> &SharedContext { &self.ctx }
   pub fn raw_gl(&self) -> &RawGL { self.ctx.raw_gl() }
   pub fn addr(&self) -> u32 { self.addr }
@@ -223,11 +221,6 @@ impl Program {
 
 impl Drop for Program {
   fn drop(&mut self) { unsafe { self.raw_gl().DeleteProgram(self.addr) }; }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum BindProgramTarget {
-  Default,
 }
 
 #[derive(Debug)]
