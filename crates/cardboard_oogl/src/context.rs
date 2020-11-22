@@ -60,14 +60,11 @@ impl Context {
   #[inline(always)]
   pub fn active_texture_unit(&self) -> u32 { self.active_texture_unit.get() }
 
-  pub fn clear_color(&self, color: Colorf) {
-    // TODO: Separate the Clear call into its own function, use the bitflags
-    // crate for specifying which buffers to clear.
-    unsafe {
-      self.raw_gl.ClearColor(color.r, color.g, color.b, color.a);
-      self.raw_gl.Clear(gl::COLOR_BUFFER_BIT);
-    }
+  pub fn set_clear_color(&self, color: Colorf) {
+    unsafe { self.raw_gl.ClearColor(color.r, color.g, color.b, color.a) };
   }
+
+  pub fn clear(&self, flags: ClearFlags) { unsafe { self.raw_gl.Clear(flags.bits()) }; }
 
   pub fn set_viewport(&self, pos: Vec2<i32>, size: Vec2<i32>) {
     unsafe { self.raw_gl.Viewport(pos.x, pos.y, size.x, size.y) };
@@ -332,3 +329,11 @@ gl_enum!({
     SubRev = FUNC_REVERSE_SUBTRACT,
   }
 });
+
+bitflags! {
+  pub struct ClearFlags: u32 {
+    const COLOR = gl::COLOR_BUFFER_BIT;
+    const DEPTH = gl::DEPTH_BUFFER_BIT;
+    const STENCIL = gl::STENCIL_BUFFER_BIT;
+  }
+}

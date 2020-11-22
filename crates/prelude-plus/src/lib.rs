@@ -40,3 +40,4 @@ pub use ::anyhow::{
   Result as AnyResult,
 };
 pub use ::log::{self, debug, error, info, log, log_enabled, trace, warn, Level as LogLevel};
+pub use bitflags::bitflags;

@@ -15,6 +15,7 @@ __cargo_build__:
 
 clean:
 	cargo clean
+	rm openkrosskod.renderdoc.cap
 
 openkrosskod.renderdoc.cap: scripts/generate_renderdoc_capture_settings.py
 	$< > $@

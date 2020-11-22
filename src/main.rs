@@ -1,4 +1,4 @@
-#![forbid(missing_debug_implementations)]
+#![deny(missing_debug_implementations)]
 #![allow(clippy::new_without_default, clippy::missing_safety_doc)]
 #![feature(test, get_mut_unchecked)]
 
@@ -123,6 +123,8 @@ fn try_main() -> AnyResult<()> {
 
   let gl = Rc::new(oogl::Context::load_with(&video_subsystem, gl_ctx));
   debug!("{:?}", gl.capabilities());
+  gl.set_clear_color(BACKGROUND_COLOR);
+  gl.clear(oogl::ClearFlags::COLOR);
 
   gl.set_blending_enabled(true);
   gl.set_blending_factors(oogl::BlendingFactor::SrcAlpha, oogl::BlendingFactor::OneMinusSrcAlpha);
@@ -508,8 +510,11 @@ impl Game {
   }
 
   pub fn render(&mut self) {
-    self.globals.gl.set_viewport(vec2n(0), self.globals.window_size_i.cast_into());
-    self.globals.gl.clear_color(BACKGROUND_COLOR);
+    let gl = &self.globals.gl;
+    if self.globals.window_was_resized {
+      gl.set_viewport(vec2n(0), self.globals.window_size_i.cast_into());
+    }
+    gl.clear(oogl::ClearFlags::COLOR);
 
     self.renderer.prepare();
     let window_size = self.globals.window_size;

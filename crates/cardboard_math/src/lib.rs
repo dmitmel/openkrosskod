@@ -1,4 +1,5 @@
 #![cfg_attr(feature = "const_fn", feature(const_fn))]
+#![deny(missing_debug_implementations)]
 
 pub mod colors;
 pub mod ops;
