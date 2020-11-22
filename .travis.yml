@@ -1,0 +1,19 @@
+os: linux
+language: rust
+rust: nightly
+cache: cargo
+
+jobs:
+  include:
+    - stage: test
+      addons:
+        apt:
+          packages:
+            - libsdl2-dev
+      before_script:
+        - rustup component add rustfmt clippy
+      script:
+        - cargo build  --workspace --verbose --all-targets
+        - cargo test   --workspace --verbose
+        - cargo fmt    --all       --verbose -- --check
+        - cargo clippy --workspace --verbose
