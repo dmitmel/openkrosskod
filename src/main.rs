@@ -134,7 +134,6 @@ fn try_main() -> AnyResult<()> {
       gl,
       game_fs,
       random,
-      performance_timings: PerformanceTimings::default(),
 
       should_stop_game_loop: Cell::new(false),
       first_game_loop_tick: true,
@@ -296,11 +295,7 @@ impl Game {
         globals.time += delta_time;
       }
 
-      {
-        let start_time = Instant::now();
-        self.process_input();
-        mut_globals(self).performance_timings.process_input = start_time.elapsed()
-      };
+      self.process_input();
 
       self.early_update();
 
@@ -314,22 +309,14 @@ impl Game {
         fixed_update_time_accumulator -= fixed_delta_time;
       }
 
-      {
-        let start_time = Instant::now();
-        self.update();
-        mut_globals(self).performance_timings.update = start_time.elapsed()
-      };
+      self.update();
 
       if cfg!(feature = "gl_debug_all_commands") {
         println!("================ [OpenGL] ================");
       }
 
-      {
-        let start_time = Instant::now();
-        self.render();
-        self.window.gl_swap_window();
-        mut_globals(self).performance_timings.render = start_time.elapsed()
-      }
+      self.render();
+      self.window.gl_swap_window();
 
       mut_globals(self).first_game_loop_tick = false;
       prev_time = current_time;
@@ -537,7 +524,7 @@ impl Game {
         scale: SCORE_LABEL_TEXT_SCALE,
         character_spacing: SCORE_LABEL_CHAR_SPACING,
         horizontal_align: *align,
-        vertical_align: TextAlign::End,
+        vertical_align: TextAlign::Start,
       };
       let (_text_block_size, char_spacing) = self.font.measure_size(text_block);
       let pos = vec2(side * char_spacing.x / 2.0, window_size.y / 2.0);
@@ -585,30 +572,6 @@ impl Game {
         fill: ShapeFill::Color(color),
         fill_clipping: None,
       });
-    }
-
-    let perf = &self.globals.performance_timings;
-    for (index, text) in [
-      format!("process_input: {:.03}", perf.process_input.as_micros() as f64 / 1e3).as_str(),
-      format!("update: {:.03}", perf.update.as_micros() as f64 / 1e3).as_str(),
-      format!("render: {:.03}", perf.render.as_micros() as f64 / 1e3).as_str(),
-    ]
-    .iter()
-    .enumerate()
-    {
-      let text_block = &mut TextBlock {
-        text,
-        scale: vec2n(4.0),
-        character_spacing: SCORE_LABEL_CHAR_SPACING,
-        horizontal_align: TextAlign::End,
-        vertical_align: TextAlign::Start,
-      };
-      let (_text_block_size, char_spacing) = self.font.measure_size(text_block);
-      self.renderer.draw_text(
-        &mut self.font,
-        window_size / 2.0 - vec2(0.0, char_spacing.y * index as f32),
-        text_block,
-      );
     }
   }
 }

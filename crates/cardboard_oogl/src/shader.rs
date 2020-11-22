@@ -70,6 +70,9 @@ impl Shader {
       }
     }
 
+    // TODO: Parse error messages and print corresponding source code lines. See
+    // <https://github.com/krux02/opengl-sandbox/blob/dbb100bb0bbad96e53b1844c5a5ab7be1673e706/fancygl/glwrapper.nim#L915-L946>
+
     buf
   }
 }
@@ -143,6 +146,8 @@ impl Program {
         buf.set_len(text_len as usize);
       }
     }
+
+    // TODO: see Shader::info_log
 
     buf
   }
