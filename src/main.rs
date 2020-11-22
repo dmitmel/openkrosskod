@@ -1,304 +1,384 @@
 /*!
 
-_**NOTE(2020-11-21)** from my future self:_
+_**NOTE(2020-11-22)** from my future self:_
 
-Greetings, Seeker! The code you are currently reading is what I consider my
-first OpenGL program, as well as the first time I tried out shaders. It was
-written sometime in between 2019-10-29, which is presumably when I created the
-original Cargo project (and shortly after I had come up with the idea of a
-project which would later be named openKrossKod), and 2019-11-21, which is when
-I shared a couple of demos I wrote (see below) and stopped adding any code to
-this program (unfortunately there wasn't much evidence to narrow down these
-dates further). After that it was collecting dust in a directory named
-`opengl-playground` for approximately ten months.
-
-The initial name of the Cargo project was in fact `sdl2-min` as it was an
-experiment on how few (or many) dependencies would be needed for openKrossKod
-(I had grossly underestimated the number); I later used this data in one of my
-dependency reduction PRs to the [`sdl2`] crate. Initially I had planned on
-using just `SDL_gfx` for graphics, but shortly after I realized that the
-capabilities of this library would not be enough, so I made a decision to learn
-OpenGL, the general-purpose computer graphics API. After reading a bunch of
-OpenGL tutorials (very likely on the evening of 2019-11-21) I took an [example
-program](https://github.com/brendanzab/gl-rs/blob/1b698f1e5287cdc4cc5610a9b6e10c9f2905b73c/gl/examples/triangle.rs)
-from the [`gl`] crate, adapted it for the SDL library and began writing tiny
-demos on top of that. Here is a
-[screenshot](https://media.discordapp.net/attachments/293439912362115072/647148408498290698/unknown.png)
-of a program which draws a circle around the current position of the mouse
-pointer, you can see the fragment shader code in a window in background. Then
-there is this
-[video](https://cdn.discordapp.com/attachments/382339402338402317/762392858371424276/winter_2019_triangle.mp4)
-of a spinning triangle filled with a rainbow-pattern - this is a program the
-source code of which you see here (unfortunately I couldn't recover the source
-code of the first demo) and to be honest, it is what made me fall in love, so
-to speak, with fragment shaders. Another thing I remember writing is a simple
-equation plotter - you can see commented-out parts of its code, but I haven't
-checked if it works.
-
-After that I haven't touched neither OpenGL nor Rust for a long, long time.
-Though I did make a small comeback into computer graphics on 2020-04-09 with my
-[shader mod for
-CrossCode](https://github.com/dmitmel/crosscode-libshader/tree/bbee14884589fbe44f3bc3996a6a8585caf1b44b)
-(demos:
-[1](https://cdn.discordapp.com/attachments/276459212807340034/697849408682721360/simplescreenrecorder-2020-04-09_19.43.54.mp4),
-[2](https://cdn.discordapp.com/attachments/401253194690199554/697860605742153728/unknown.png),
-[3](https://cdn.discordapp.com/attachments/276459212807340034/697929245023928380/unknown.png),
-[4](https://cdn.discordapp.com/attachments/683767232668762203/701139440747282542/unknown.png),
-[5](https://cdn.discordapp.com/attachments/500980711466074123/698128118619176970/unknown.png)).
-
-And thus I upload this code exactly one year later, in almost untouched state,
-to the openKrossKod repository. Granted, I did make a couple of changes: I
-rewrote the `Cargo.toml` manifest and fixed an obvious bug with the shader
-program linking status not being checked, but other than that there are no
-changes! This is literally the program openKrossKod is based on. Well, there
-you have it - a great journey of making an opensource CrossCode engine out of
-this begins, I guess!
+Greetings, Seeker! I'm glad you took interest in the early history of the
+openKrossKod codebase and internals. Here's the source code of the famous
+(well, among certain experts) "Spinning San-Cheese" demo, along with the early
+takes on the modules which will later be called `cardboard_oogl` and
+`cardboard_math`. [Here it is in
+action](https://cdn.discordapp.com/attachments/382339402338402317/757002993093574717/simplescreenrecorder-2020-09-20_01.11.50_enc.mp4)
+([the original, not re-encoded
+file](https://cdn.discordapp.com/attachments/701049519701491712/757001316664082432/simplescreenrecorder-2020-09-20_01.11.50.mp4)).
 
 */
 
-use sdl2::event::Event;
+#![allow(clippy::new_without_default)]
+#![feature(negative_impls)]
+#![feature(debug_non_exhaustive)]
+#![feature(const_fn)]
+
+pub mod gl;
+pub mod gl_prelude;
+pub mod math;
+pub mod oogl;
+pub mod prelude;
+pub mod utils;
+
+use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Keycode;
+use sdl2::mouse::MouseButton;
 use sdl2::video::GLProfile;
 
-use gl::types::*;
-use std::ffi::CString;
-use std::mem;
-use std::ptr;
-use std::str;
+use gl_prelude::*;
+use math::ops::{Lerp, RangeMap};
+use math::{vec2, vec2n, Vec2, Vec2d, Vec2f};
+use oogl::{BoundBuffer, BoundTexture, SetUniform};
+use prelude::*;
+use rand::{thread_rng, Rng};
 
-// const VERTEX_DATA: [GLfloat; 12] =
-//   [-1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, 1.0];
-// const VERTEX_DATA: [GLfloat; 6] = [-0.33, -0.66, 0.33, -0.66, 0.0, 0.66];
-const VERTEX_DATA: [GLfloat; 6] = [0.0, 1.0, 0.87, -0.5, -0.5, -0.87];
-// const VERTEX_DATA: [GLfloat; 8] = [0.5, 0.5, 0.5, -0.5, -0.5, -0.5, -0.5, 0.5];
-// const VERTEX_DATA: [GLfloat; 8] = [1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0];
-// const ELEMENT_DATA: [GLuint; 6] = [0, 1, 2, 0, 3, 2];
-const ELEMENT_DATA: [GLuint; 3] = [0, 1, 2];
+const GL_CONTEXT_PROFILE: GLProfile = GLProfile::GLES;
+const GL_CONTEXT_VERSION: (u8, u8) = (2, 0);
 
-static VS_SRC: &str = include_str!("main.vert");
-static FS_SRC: &str = include_str!("main.frag");
+const FLOATS_PER_VERTEX: usize = 2 + 3 + 2 + 1;
+const VERTICES_COUNT: usize = 3;
 
-fn compile_shader(src: &str, ty: GLenum) -> GLuint {
-  unsafe {
-    let shader = gl::CreateShader(ty);
-    // Attempt to compile the shader
-    let c_str = CString::new(src.as_bytes()).unwrap();
-    gl::ShaderSource(shader, 1, &c_str.as_ptr(), ptr::null());
-    gl::CompileShader(shader);
+#[rustfmt::skip]
+const VERTEX_DATA: [GLfloat; FLOATS_PER_VERTEX * VERTICES_COUNT] = [
+  // x     y     r    g    b     t    u    i
+    0.5, -0.5,  1.0, 0.0, 0.0,  0.0, 0.0, 0.5,
+   -0.5, -0.5,  0.0, 1.0, 0.0,  1.0, 0.0, 0.5,
+    0.0,  0.5,  0.0, 0.0, 1.0,  0.5, 1.0, 0.5,
+];
+const ELEMENT_DATA: [GLushort; VERTICES_COUNT] = [0, 1, 2];
 
-    // Get the compile status
-    let mut status = gl::FALSE as GLint;
-    gl::GetShaderiv(shader, gl::COMPILE_STATUS, &mut status);
+// const VERTEX_DATA: [GLfloat; 8] = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0];
+// const ELEMENT_DATA: [GLushort; 6] = [0, 1, 2, 2, 3, 0];
 
-    // Fail on error
-    // if status != (gl::TRUE as GLint) {
-    let mut len = 0;
-    gl::GetShaderiv(shader, gl::INFO_LOG_LENGTH, &mut len);
-    if len > 0 {
-      let mut buf = Vec::with_capacity(len as usize);
-      buf.set_len((len as usize) - 1); // subtract 1 to skip the trailing null character
-      gl::GetShaderInfoLog(
-        shader,
-        len,
-        ptr::null_mut(),
-        buf.as_mut_ptr() as *mut GLchar,
-      );
-      panic!("{}", str::from_utf8(&buf).expect("ShaderInfoLog not valid utf8"));
-    }
+const VS_SRC: &[u8] = include_bytes!("shaders/color.vert");
+const FS_SRC: &[u8] = include_bytes!("shaders/color.frag");
+const IMAGE_DATA: &[u8] = include_bytes!("../SanCheese.png");
 
-    shader
+fn compile_shader(ctx: Rc<oogl::Context>, src: &[u8], type_: oogl::ShaderType) -> oogl::Shader {
+  let shader = oogl::Shader::new(ctx, type_);
+  shader.set_source(src);
+
+  let success = shader.compile();
+  let log = shader.get_info_log();
+  let log = String::from_utf8_lossy(&log);
+  if !success {
+    panic!("Shader compilation error(s):\n{}", log);
+  } else if !log.is_empty() {
+    eprintln!("Shader compilation warning(s):\n{}", log);
   }
+
+  shader
 }
 
-fn link_program(vs: GLuint, fs: GLuint) -> GLuint {
-  unsafe {
-    let program = gl::CreateProgram();
-    gl::AttachShader(program, vs);
-    gl::AttachShader(program, fs);
-    gl::LinkProgram(program);
-    // Get the link status
-    let mut status = gl::FALSE as GLint;
-    gl::GetProgramiv(program, gl::LINK_STATUS, &mut status);
-
-    // Fail on error
-    // if status != (gl::TRUE as GLint) {
-    let mut len: GLint = 0;
-    gl::GetProgramiv(program, gl::INFO_LOG_LENGTH, &mut len);
-    if len > 0 {
-      let mut buf = Vec::with_capacity(len as usize);
-      buf.set_len((len as usize) - 1); // subtract 1 to skip the trailing null character
-      gl::GetProgramInfoLog(
-        program,
-        len,
-        ptr::null_mut(),
-        buf.as_mut_ptr() as *mut GLchar,
-      );
-      panic!(
-        "{}",
-        str::from_utf8(&buf).expect("ProgramInfoLog not valid utf8")
-      );
-    }
-
-    program
+fn link_program(ctx: Rc<oogl::Context>, shaders: &[&oogl::Shader]) -> oogl::ShaderProgram {
+  let program = oogl::ShaderProgram::new(ctx);
+  for shader in shaders {
+    program.attach_shader(shader);
   }
-}
 
-extern "system" fn print_gl_debug_message(
-  source: GLenum,
-  gltype: GLenum,
-  id: GLuint,
-  severity: GLenum,
-  length: GLsizei,
-  message: *const GLchar,
-  _user_param: *mut GLvoid,
-) {
-  let message_bytes = unsafe {
-    std::slice::from_raw_parts(message as *const u8, length as usize)
-  };
-  eprintln!(
-    "GL debug: source = 0x{:x}, type = 0x{:x}, id = 0x{:x}, severity = 0x{:x}, message = {:?}",
-    source, gltype, id, severity, str::from_utf8(message_bytes)
-  );
+  let success = program.link();
+  let log = program.get_info_log();
+  let log = String::from_utf8_lossy(&log);
+  if !success {
+    panic!("Program linking error: {}", log);
+  } else if !log.is_empty() {
+    eprintln!("Program linking warning: {}", log);
+  }
+
+  for shader in shaders {
+    program.detach_shader(shader);
+  }
+  program
 }
 
 fn main() {
   let sdl_context = sdl2::init().unwrap();
   let video_subsystem = sdl_context.video().unwrap();
 
-  let window = video_subsystem
-    .window("Window", 800, 600)
-    .resizable()
-    .opengl()
-    .build()
-    .unwrap();
+  let window_title = concat!(env!("CARGO_PKG_NAME"), " v", env!("CARGO_PKG_VERSION"));
+  let window =
+    video_subsystem.window(window_title, 800, 600).resizable().opengl().build().unwrap();
 
   let gl_attr = video_subsystem.gl_attr();
-  gl_attr.set_context_profile(GLProfile::Core);
-  gl_attr.set_context_version(3, 3);
+  gl_attr.set_context_profile(GL_CONTEXT_PROFILE);
+  gl_attr.set_context_version(GL_CONTEXT_VERSION.0, GL_CONTEXT_VERSION.1);
+  gl_attr.set_context_flags().debug().set();
 
-  let ctx = window.gl_create_context().unwrap();
-  gl::load_with(|name| video_subsystem.gl_get_proc_address(name) as *const _);
+  let gl_ctx = window.gl_create_context().unwrap();
+  assert_eq!(gl_attr.context_profile(), GL_CONTEXT_PROFILE);
+  assert_eq!(gl_attr.context_version(), GL_CONTEXT_VERSION);
 
-  debug_assert_eq!(gl_attr.context_profile(), GLProfile::Core);
-  debug_assert_eq!(gl_attr.context_version(), (3, 3));
+  let gl = Rc::new(oogl::Context::load_with(|name| {
+    video_subsystem.gl_get_proc_address(name) as *const _
+  }));
 
   let mut event_pump = sdl_context.event_pump().unwrap();
 
   // Create GLSL shaders
-  let vs = compile_shader(VS_SRC, gl::VERTEX_SHADER);
-  let fs = compile_shader(FS_SRC, gl::FRAGMENT_SHADER);
-  let program = link_program(vs, fs);
+  let vs = compile_shader(Rc::clone(&gl), VS_SRC, oogl::ShaderType::Vertex);
+  let fs = compile_shader(Rc::clone(&gl), FS_SRC, oogl::ShaderType::Fragment);
+  let mut program = link_program(Rc::clone(&gl), &[&vs, &fs]);
 
-  let mut vao = 0;
-  let mut vbo = 0;
-  let mut ebo = 0;
+  let uniform_tex_size = program.get_uniform(b"tex_size");
+  let uniform_window_size = program.get_uniform(b"window_size");
+  let uniform_time = program.get_uniform(b"time");
+  let uniform_tex = program.get_uniform(b"tex");
+  let uniform_random_seed = program.get_uniform(b"random_seed");
+  let uniform_random = program.get_uniform(b"random");
 
-  let mut window_size_uniform = 0;
+  let vertex_attr_pos = program.get_attribute_location(b"position");
+  let vertex_attr_color = program.get_attribute_location(b"color");
+  let vertex_attr_texcoord = program.get_attribute_location(b"texcoord");
+  let vertex_attr_color_intensity = program.get_attribute_location(b"color_intensity");
 
-  let mut t = 0.0;
-  let mut t_uniform = 0;
+  let program_bound = program.bind();
 
-  unsafe {
-    gl::Enable(gl::DEBUG_OUTPUT);
-    gl::DebugMessageCallback(Some(print_gl_debug_message), ptr::null());
-
-    // Create Vertex Array Object
-    gl::GenVertexArrays(1, &mut vao);
-    gl::BindVertexArray(vao);
-
-    // Create a Vertex Buffer Object and copy the vertex data to it
-    gl::GenBuffers(1, &mut vbo);
-    gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
-    gl::BufferData(
-      gl::ARRAY_BUFFER,
-      (VERTEX_DATA.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
-      mem::transmute(&VERTEX_DATA[0]),
-      gl::STATIC_DRAW,
-    );
-
-    gl::GenBuffers(1, &mut ebo);
-    gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
-    gl::BufferData(
-      gl::ELEMENT_ARRAY_BUFFER,
-      (ELEMENT_DATA.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
-      mem::transmute(&ELEMENT_DATA[0]),
-      gl::STATIC_DRAW,
-    );
-
-    // Use shader program
-    gl::UseProgram(program);
-    let c_str = CString::new("out_color").unwrap();
-    gl::BindFragDataLocation(program, 0, c_str.as_ptr());
-
-    // Specify the layout of the vertex data
-    let c_str = CString::new("position").unwrap();
-    let pos_attr = gl::GetAttribLocation(program, c_str.as_ptr());
-    gl::EnableVertexAttribArray(pos_attr as GLuint);
-    gl::VertexAttribPointer(
-      pos_attr as GLuint,
-      2,
-      gl::FLOAT,
-      gl::FALSE,
-      0,
-      ptr::null(),
-    );
-
-    let c_str = CString::new("window_size").unwrap();
-    window_size_uniform = gl::GetUniformLocation(program, c_str.as_ptr());
-
-    let window_size = window.size();
-    gl::Uniform2f(
-      window_size_uniform,
-      window_size.0 as GLfloat,
-      window_size.1 as GLfloat,
-    );
-
-    let c_str = CString::new("t").unwrap();
-    t_uniform = gl::GetUniformLocation(program, c_str.as_ptr());
-    gl::Uniform1f(t_uniform, t);
+  let texture_unit = 0;
+  let mut texture = oogl::Texture::new(gl.clone());
+  let texture_bound = oogl::BoundTexture2D::new(&mut texture, Some(texture_unit));
+  texture_bound.set_wrapping_modes(oogl::TextureWrappingMode::ClampToEdge);
+  texture_bound.set_filters(oogl::TextureFilter::Nearest, None);
+  if let Some(tex_uniform) = &uniform_tex {
+    tex_uniform.set(&gl, texture_unit as u32);
   }
 
-  'running: loop {
-    unsafe {
-      gl::ClearColor(0.3, 0.3, 0.3, 1.0);
-      gl::Clear(gl::COLOR_BUFFER_BIT);
+  {
+    // let decoder = png::Decoder::new(File::open("SanCheese2.png").unwrap());
+    let decoder = png::Decoder::new(IMAGE_DATA);
+    let (info, mut reader) = decoder.read_info().unwrap();
+    let mut buf = vec![0; info.buffer_size()];
+    reader.next_frame(&mut buf).unwrap();
 
-      gl::DrawElements(gl::TRIANGLES, 3, gl::UNSIGNED_INT, ptr::null());
+    use oogl::{TextureInputFormat, TextureInternalFormat};
+    use png::{BitDepth, ColorType};
 
-      t += 0.1;
-      gl::Uniform1f(t_uniform, t);
+    match info.bit_depth {
+      BitDepth::Eight => {}
+      _ => unimplemented!("Unsupported texture bit depth: {:?}", info.bit_depth),
     }
 
-    window.gl_swap_window();
+    let (gl_format, gl_internal_format) = match info.color_type {
+      ColorType::Grayscale => (TextureInputFormat::Luminance, TextureInternalFormat::Luminance),
+      ColorType::RGB => (TextureInputFormat::RGB, TextureInternalFormat::RGB),
+      ColorType::GrayscaleAlpha => {
+        (TextureInputFormat::LuminanceAlpha, TextureInternalFormat::LuminanceAlpha)
+      }
+      ColorType::RGBA => (TextureInputFormat::RGBA, TextureInternalFormat::RGBA),
+      _ => unimplemented!("Unsupported texture color type: {:?}", info.color_type),
+    };
+
+    texture_bound.set_data(0, gl_format, gl_internal_format, (info.width, info.height), &buf);
+
+    if let Some(tex_size_uniform) = &uniform_tex_size {
+      tex_size_uniform.set(&gl, (info.width as f32, info.height as f32));
+    }
+  }
+
+  let mut vbo = oogl::Buffer::new(gl.clone());
+  let vbo_bound = oogl::BoundVertexBuffer::new(&mut vbo);
+  // vbo_bound.set_data(&VERTEX_DATA, oogl::BufferUsageHint::StaticDraw);
+
+  #[allow(clippy::erasing_op)]
+  unsafe {
+    let float_size = mem::size_of::<GLfloat>();
+    let stride = (FLOATS_PER_VERTEX * float_size) as GLsizei;
+
+    if let Some(vertex_attr_pos) = vertex_attr_pos {
+      gl.gl.EnableVertexAttribArray(vertex_attr_pos);
+      gl.gl.VertexAttribPointer(
+        vertex_attr_pos,
+        2,
+        gl::FLOAT,
+        gl::FALSE,
+        stride,
+        (0 * float_size) as *const GLvoid,
+      );
+    }
+
+    if let Some(vertex_attr_color) = vertex_attr_color {
+      gl.gl.EnableVertexAttribArray(vertex_attr_color);
+      gl.gl.VertexAttribPointer(
+        vertex_attr_color,
+        3,
+        gl::FLOAT,
+        gl::FALSE,
+        stride,
+        (2 * float_size) as *const GLvoid,
+      );
+    }
+
+    if let Some(vertex_attr_texcoord) = vertex_attr_texcoord {
+      gl.gl.EnableVertexAttribArray(vertex_attr_texcoord);
+      gl.gl.VertexAttribPointer(
+        vertex_attr_texcoord,
+        2,
+        gl::FLOAT,
+        gl::FALSE,
+        stride,
+        (5 * float_size) as *const GLvoid,
+      );
+    }
+
+    if let Some(vertex_attr_color_intensity) = vertex_attr_color_intensity {
+      gl.gl.EnableVertexAttribArray(vertex_attr_color_intensity);
+      gl.gl.VertexAttribPointer(
+        vertex_attr_color_intensity,
+        1,
+        gl::FLOAT,
+        gl::FALSE,
+        stride,
+        (7 * float_size) as *const GLvoid,
+      );
+    }
+  }
+
+  let mut ebo = oogl::Buffer::new(gl.clone());
+  let ebo_bound = oogl::BoundElementBuffer::new(&mut ebo);
+  ebo_bound.set_data(&ELEMENT_DATA, oogl::BufferUsageHint::StaticDraw);
+
+  let mut time: f64 = 0.0;
+
+  let mut rng = thread_rng();
+  if let Some(random_seed_uniform) = &uniform_random_seed {
+    random_seed_uniform.set(&gl, rng.gen::<f32>());
+  }
+
+  let mut vertices: [Vec2f; VERTICES_COUNT] = [vec2(0.5, -0.5), vec2(-0.5, -0.5), vec2(0.0, 0.5)];
+  let texcoords: [Vec2f; VERTICES_COUNT] = [vec2(0.0, 1.0), vec2(1.0, 1.0), vec2(0.5, 0.0)];
+  let mut selected_vertex = None::<usize>;
+
+  let mut window_size: Vec2<u32> = Vec2::from(window.size());
+  let mut mouse_pos: Vec2d = vec2n(0.0);
+
+  let mut prev_time = Instant::now();
+  'game_loop: loop {
+    let current_time = Instant::now();
+    let delta_time: f64 = (current_time - prev_time).as_secs_f64();
+    prev_time = current_time;
+
     for event in event_pump.poll_iter() {
       match event {
-        Event::Quit { .. }
-        | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-          break 'running
+        Event::Quit { .. } | Event::KeyUp { keycode: Some(Keycode::Escape), .. } => {
+          break 'game_loop;
         }
-        Event::Window {
-          win_event: sdl2::event::WindowEvent::SizeChanged(width, height),
-          ..
-        } => unsafe {
-          gl::Viewport(0, 0, width, height);
-          let window_size = window.size();
-          gl::Uniform2f(
-            window_size_uniform,
-            window_size.0 as GLfloat,
-            window_size.1 as GLfloat,
-          );
-        },
+
+        Event::Window { win_event: WindowEvent::SizeChanged(w, h), .. } => {
+          assert!(w > 0 && h > 0, "w = {}, h = {}", w, h);
+          window_size = vec2(w as u32, h as u32);
+          gl.set_viewport(0, 0, w, h);
+        }
+
+        Event::MouseMotion { x, y, .. } => {
+          mouse_pos = window_coords_to_gl_coords(vec2(
+            x as f64 / window_size.x as f64,
+            y as f64 / window_size.y as f64,
+          ));
+        }
+
+        Event::MouseButtonDown { mouse_btn: MouseButton::Left, .. } => {
+          let mut min_distance = f64::INFINITY;
+
+          for i in 0..VERTICES_COUNT {
+            let distance = mouse_pos.sqr_distance(vertices[i].as_f64());
+            if distance < min_distance {
+              min_distance = distance;
+              selected_vertex = Some(i);
+            }
+          }
+        }
+
+        Event::MouseButtonUp { mouse_btn: MouseButton::Left, .. } => {
+          selected_vertex = None;
+        }
+
         _ => {}
       }
     }
-    std::thread::sleep(std::time::Duration::new(0, 1_000_000_000u32 / 60));
+
+    gl.clear_color(0.3, 0.3, 0.3, 1.0);
+
+    time += delta_time;
+    if let Some(time_uniform) = &uniform_time {
+      time_uniform.set(&gl, time as f32);
+    }
+
+    if let Some(random_uniform) = &uniform_random {
+      random_uniform.set(&gl, rng.gen::<f32>());
+    }
+
+    if let Some(window_size_uniform) = &uniform_window_size {
+      window_size_uniform.set(&gl, (window_size.x as f32, window_size.y as f32));
+    }
+
+    let mut vertex_data = VERTEX_DATA;
+    fn set_vertex_data_float(
+      vertex_data: &mut [f32],
+      vertex_index: usize,
+      field_offset: usize,
+      value: f32,
+    ) {
+      vertex_data[vertex_index * FLOATS_PER_VERTEX + field_offset] = value;
+    }
+    fn set_vertex_data_vec2(
+      vertex_data: &mut [f32],
+      vertex_index: usize,
+      field_offset: usize,
+      value: Vec2f,
+    ) {
+      set_vertex_data_float(vertex_data, vertex_index, field_offset, value.x);
+      set_vertex_data_float(vertex_data, vertex_index, field_offset + 1, value.y);
+    }
+
+    if let Some(selected_vertex) = selected_vertex {
+      vertices[selected_vertex] = mouse_pos.as_f32();
+    }
+
+    if let Some(random_uniform) = &uniform_random {
+      random_uniform.set(&gl, rng.gen::<f32>());
+    }
+
+    let texcoords_rotation = (time % VERTICES_COUNT as f64).floor() as usize;
+    for i in 0..VERTICES_COUNT {
+      let vertex = vertices[i];
+      set_vertex_data_vec2(&mut vertex_data, i, 0, vertex);
+
+      let current_texcoord = texcoords[(texcoords_rotation + i) % VERTICES_COUNT];
+      let next_texcoord = texcoords[(texcoords_rotation + i + 1) % VERTICES_COUNT];
+      set_vertex_data_vec2(
+        &mut vertex_data,
+        i,
+        5,
+        current_texcoord.lerp(next_texcoord, time.fract() as f32),
+      );
+
+      let intensity_rotation = 2.0 * i as f64 / VERTICES_COUNT as f64;
+      set_vertex_data_float(
+        &mut vertex_data,
+        i,
+        7,
+        (((f64::consts::PI * (-time + intensity_rotation)).sin() + 1.0) / 2.0)
+          .range_map((0.0, 1.0), (1.0 / 8.0, 2.0 / 3.0)) as f32,
+      );
+    }
+
+    vbo_bound.set_data(&vertex_data, oogl::BufferUsageHint::DynamicDraw);
+
+    ebo_bound.draw(&program_bound, oogl::DrawPrimitive::Triangles, 0, VERTICES_COUNT as u32);
+    // vbo_bound.draw(&program_bound, oogl::DrawPrimitive::TriangleFan, 0, VERTICES_COUNT as u32);
+
+    window.gl_swap_window();
+
+    thread::sleep(time::Duration::new(0, 1_000_000_000u32 / 60));
   }
 
-  unsafe {
-    gl::DeleteProgram(program);
-    gl::DeleteShader(fs);
-    gl::DeleteShader(vs);
-    gl::DeleteBuffers(1, &vbo);
-    gl::DeleteVertexArrays(1, &vao);
-  }
+  drop(gl_ctx);
+}
+
+fn window_coords_to_gl_coords(point: Vec2d) -> Vec2d {
+  vec2(point.x * 2.0 - 1.0, 1.0 - point.y * 2.0)
 }

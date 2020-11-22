@@ -10,5 +10,13 @@ repository = "https://github.com/dmitmel/openkrosskod.git"
 homepage = "https://github.com/dmitmel/openkrosskod"
 
 [dependencies]
-sdl2 = "*"
-gl = "*"
+sdl2 = "0.34.3"
+png = "0.16.7"
+rand = "0.7.3"
+cfg-if = "0.1.10"
+
+[build-dependencies]
+gl_generator = "0.14.0"
+
+[features]
+gl_unbind_bindings_on_drop = []
