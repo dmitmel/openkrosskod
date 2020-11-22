@@ -1,5 +1,4 @@
-use crate::debug;
-use ::gl::prelude::*;
+use crate::impl_prelude::*;
 use cardboard_math::*;
 use prelude_plus::*;
 
@@ -24,8 +23,11 @@ impl !Send for Context {}
 impl !Sync for Context {}
 
 impl Context {
+  #[inline(always)]
   pub fn raw_gl(&self) -> &RawGL { &self.raw_gl }
+  #[inline(always)]
   pub fn sdl_gl_context(&self) -> &sdl2::video::GLContext { &self.sdl_gl_context }
+  #[inline(always)]
   pub fn capabilities(&self) -> &ContextCapabilities { &self.capabilities }
 
   pub fn load_with(
@@ -35,16 +37,9 @@ impl Context {
     let gl = Gles2::load_with(|name| video_subsystem.gl_get_proc_address(name) as *const GLvoid);
 
     // This has to be done first!!!
-    if gl.DebugMessageCallback.is_loaded() {
-      unsafe {
-        gl.Enable(gl::DEBUG_OUTPUT);
-        gl.DebugMessageCallback(Some(debug::internal_debug_message_callback), ptr::null());
-      }
-    }
+    crate::debug::init(&gl);
 
     let capabilities = ContextCapabilities::load(&gl);
-
-    unsafe { gl.Enable(gl::BLEND) };
 
     Self {
       raw_gl: gl,
@@ -62,6 +57,9 @@ impl Context {
     }
   }
 
+  #[inline(always)]
+  pub fn active_texture_unit(&self) -> u32 { self.active_texture_unit.get() }
+
   pub fn clear_color(&self, color: Colorf) {
     unsafe {
       self.raw_gl.ClearColor(color.r, color.g, color.b, color.a);
@@ -71,6 +69,19 @@ impl Context {
 
   pub fn set_viewport(&self, pos: Vec2<i32>, size: Vec2<i32>) {
     unsafe { self.raw_gl.Viewport(pos.x, pos.y, size.x, size.y) };
+  }
+
+  unsafe fn set_feature_enabled(&self, feature: GLenum, enabled: bool) {
+    if enabled {
+      self.raw_gl.Enable(feature);
+    } else {
+      self.raw_gl.Disable(feature);
+    }
+  }
+
+  #[inline(always)]
+  pub fn set_blending_enabled(&self, enabled: bool) {
+    unsafe { self.set_feature_enabled(gl::BLEND, enabled) };
   }
 
   pub fn set_blending_factors(&self, src: BlendingFactor, dest: BlendingFactor) {
@@ -100,9 +111,11 @@ pub(crate) struct BindingTarget<T> {
   phantom: PhantomData<*mut T>,
 }
 impl<T> BindingTarget<T> {
+  #[inline(always)]
   pub(crate) fn bound_addr(&self) -> u32 { self.bound_addr.get() }
+  #[inline(always)]
   #[allow(dead_code)]
-  pub(crate) fn is_anything_bound(&self) -> bool { self.bound_addr.get() != 0 }
+  pub(crate) fn is_anything_bound(&self) -> bool { self.bound_addr() != 0 }
   pub(crate) fn new(target: GLenum) -> Self {
     Self { target, bound_addr: Cell::new(0), phantom: PhantomData }
   }
@@ -114,7 +127,7 @@ macro_rules! impl_binding_target_state {
 
     #[allow(dead_code)]
     impl BindingTarget<$target_enum> {
-      #[inline(always)]
+      #[inline]
       pub(crate) fn bind_unconditionally(&self, gl: &RawGL, addr: u32) {
         unsafe { gl.$gl_bind_fn($(self.$target, )? addr) };
         self.bound_addr.set(addr);
@@ -125,10 +138,11 @@ macro_rules! impl_binding_target_state {
         self.bind_unconditionally(gl, 0)
       }
 
-      #[inline(always)]
-      pub(crate) fn bind_if_needed(&self, gl: &RawGL, addr: u32) {
+      #[inline]
+      pub(crate) fn bind_if_needed(&self, gl: &RawGL, addr: u32, set_on_bind_flag: &mut bool) {
         if self.bound_addr.get() != addr {
           self.bind_unconditionally(gl, addr);
+          *set_on_bind_flag = true;
         }
       }
     }
@@ -176,6 +190,7 @@ impl ContextCapabilities {
       value
     }
 
+    #[inline(always)]
     fn get_uint_1(gl: &RawGL, name: GLenum) -> GLuint { get_int_1(gl, name) as _ }
 
     fn get_string(gl: &RawGL, name: GLenum) -> String {
@@ -194,7 +209,7 @@ impl ContextCapabilities {
     let glsl_version = get_string(gl, gl::SHADING_LANGUAGE_VERSION);
     info!("GLSL version:   {}", glsl_version);
 
-    let extensions = get_string(gl, gl::EXTENSIONS).split(' ').collect::<ContextExtensions>();
+    let extensions = ContextExtensions::new(get_string(gl, gl::EXTENSIONS).split(' '));
     info!("GL extensions:  {:?}", extensions);
 
     // TODO:
@@ -253,13 +268,13 @@ macro_rules! generate_context_extensions_struct {
       $(pub $field: bool),*
     }
 
-    impl<'a> FromIterator<&'a str> for ContextExtensions {
-      fn from_iter<T: IntoIterator<Item = &'a str>>(iter: T) -> Self {
+    impl ContextExtensions {
+      fn new<'a, T: IntoIterator<Item = &'a str>>(loaded_extension_names_iter: T) -> Self {
         let mut extensions = ContextExtensions {
           $($field: false),*
         };
 
-        for name in iter {
+        for name in loaded_extension_names_iter {
           match name {
             $($name => extensions.$field = true,)*
             _ => {}

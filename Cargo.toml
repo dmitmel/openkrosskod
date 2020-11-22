@@ -11,6 +11,7 @@ homepage = "https://github.com/dmitmel/openkrosskod"
 
 [workspace]
 
+# TODO: crate-type = ["dylib"]
 [dependencies]
 prelude-plus = { path = "crates/prelude-plus" }
 cardboard_math = { path = "crates/cardboard_math", features = ["serde", "const_fn"] }
@@ -29,6 +30,9 @@ simd-json = { version = "0.3.21", optional = true }
 num_cpus = "1.13.0"
 
 env_logger = { version = "0.8.1", default-features = false, features = ["termcolor", "atty", "humantime"] }
+
+nix = "0.19.0"
+
 
 [features]
 gl_debug_all_commands = ["cardboard_oogl/debug_all_commands"]

@@ -11,9 +11,13 @@ pub struct Globals {
   pub gl: oogl::SharedContext,
   pub game_fs: GameFs,
   pub random: GlobalRandom,
+  pub performance_timings: PerformanceTimings,
 
+  pub should_stop_game_loop: Cell<bool>,
+  pub first_game_loop_tick: bool,
   pub time: f64,
   pub delta_time: f64,
+  pub fixed_time: f64,
   pub fixed_delta_time: f64,
 
   pub window_size_i: Vec2<u32>,
@@ -21,6 +25,11 @@ pub struct Globals {
   pub window_was_resized: bool,
 
   pub input_state: InputState,
+}
+
+impl Globals {
+  #[inline(always)]
+  pub fn share_gl(&self) -> oogl::SharedContext { Rc::clone(&self.gl) }
 }
 
 #[derive(Debug)]
@@ -93,4 +102,14 @@ impl GlobalRandom {
 impl GlobalRandom {
   #[inline(always)] pub fn next_usize(&self) -> usize { self.next_u64() as _ }
   #[inline(always)] pub fn next_isize(&self) -> isize { self.next_i64() as _ }
+}
+
+#[derive(Debug, Default)]
+pub struct PerformanceTimings {
+  pub process_input: Duration,
+  pub early_update: Duration,
+  pub fixed_update_time_accumulator: f64,
+  pub fixed_update: Duration, // TODO: average
+  pub update: Duration,
+  pub render: Duration,
 }

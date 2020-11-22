@@ -1,5 +1,14 @@
-use ::gl::prelude::*;
+use crate::impl_prelude::*;
 use prelude_plus::*;
+
+pub(crate) fn init(gl: &RawGL) {
+  if gl.DebugMessageCallback.is_loaded() {
+    unsafe {
+      gl.Enable(gl::DEBUG_OUTPUT);
+      gl.DebugMessageCallback(Some(internal_debug_message_callback), ptr::null());
+    }
+  }
+}
 
 gl_enum!({
   pub enum DebugMessageSeverity {
@@ -35,7 +44,7 @@ gl_enum!({
   }
 });
 
-pub extern "system" fn internal_debug_message_callback(
+extern "system" fn internal_debug_message_callback(
   source: GLenum,
   type_: GLenum,
   id: GLuint,
@@ -58,7 +67,57 @@ pub extern "system" fn internal_debug_message_callback(
   let message_str = String::from_utf8_lossy(message_slice);
 
   debug!(
-    "0x{:08x} [source = {}, type = {}, severity = {}]: message = {}",
+    "0x{:08x} [source: {}, type: {}, severity: {}] {}",
     id, source_str, type_str, severity_str, message_str,
   );
+}
+
+pub(crate) unsafe fn set_object_debug_label(
+  ctx: &Context,
+  type_identifier: GLenum,
+  addr: GLuint,
+  label: &[u8],
+) {
+  let gl = ctx.raw_gl();
+  if gl.ObjectLabel.is_loaded() {
+    assert!(label.len() <= ctx.capabilities().max_debug_object_label_len as usize);
+
+    // TODO: Check that the label doesn't contain any NUL characters
+
+    gl.ObjectLabel(
+      type_identifier,
+      addr,
+      GLsizei::try_from(label.len()).unwrap(),
+      label.as_ptr() as *const GLchar,
+    );
+  }
+}
+
+pub(crate) unsafe fn get_object_debug_label(
+  ctx: &Context,
+  type_identifier: GLenum,
+  addr: GLuint,
+) -> Vec<u8> {
+  let gl = ctx.raw_gl();
+  if gl.GetObjectLabel.is_loaded() {
+    let buf_size =
+        // The buffer will contain a NUL-terminated string, so reserve one more
+        // byte for the final NUL character.
+        GLsizei::try_from(ctx.capabilities().max_debug_object_label_len + 1).unwrap();
+    let mut buf: Vec<u8> = Vec::with_capacity(buf_size as usize);
+    let mut text_len: GLint = 0;
+
+    gl.GetObjectLabel(
+      type_identifier,
+      addr,
+      buf_size,
+      &mut text_len,
+      buf.as_mut_ptr() as *mut GLchar,
+    );
+    buf.set_len(text_len as usize);
+
+    buf
+  } else {
+    vec![]
+  }
 }

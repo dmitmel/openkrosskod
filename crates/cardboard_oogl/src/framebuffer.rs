@@ -1,5 +1,4 @@
-use crate::{RawGL, SharedContext};
-// use ::gl::prelude::*;
+use crate::impl_prelude::*;
 use prelude_plus::*;
 
 gl_enum!({
@@ -12,26 +11,38 @@ gl_enum!({
 pub struct Framebuffer {
   ctx: SharedContext,
   addr: u32,
+  internal_state_acquired: bool,
 }
 
 impl !Send for Framebuffer {}
 impl !Sync for Framebuffer {}
 
+impl Object for Framebuffer {
+  const DEBUG_TYPE_IDENTIFIER: GLenum = gl::FRAMEBUFFER;
+
+  #[inline(always)]
+  fn ctx(&self) -> &SharedContext { &self.ctx }
+  #[inline(always)]
+  fn addr(&self) -> u32 { self.addr }
+  #[inline(always)]
+  fn internal_state_acquired(&self) -> bool { self.internal_state_acquired }
+}
+
 impl Framebuffer {
   pub const BIND_TARGET: BindFramebufferTarget = BindFramebufferTarget::Default;
-
-  pub fn ctx(&self) -> &SharedContext { &self.ctx }
-  pub fn raw_gl(&self) -> &RawGL { self.ctx.raw_gl() }
-  pub fn addr(&self) -> u32 { self.addr }
 
   pub fn new(ctx: SharedContext) -> Self {
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenFramebuffers(1, &mut addr) };
-    Self { ctx, addr }
+    Self { ctx, addr, internal_state_acquired: false }
   }
 
   pub fn bind(&'_ mut self) -> FramebufferBinding<'_> {
-    self.ctx.bound_framebuffer.bind_if_needed(&self.ctx.raw_gl(), self.addr);
+    self.ctx.bound_framebuffer.bind_if_needed(
+      &self.ctx.raw_gl(),
+      self.addr,
+      &mut self.internal_state_acquired,
+    );
     FramebufferBinding { framebuffer: self }
   }
 }
@@ -41,20 +52,21 @@ impl Drop for Framebuffer {
 }
 
 #[derive(Debug)]
-pub struct FramebufferBinding<'tex> {
-  framebuffer: &'tex mut Framebuffer,
+pub struct FramebufferBinding<'obj> {
+  framebuffer: &'obj mut Framebuffer,
 }
 
-impl<'tex> FramebufferBinding<'tex> {
-  pub const BIND_TARGET: BindFramebufferTarget = Framebuffer::BIND_TARGET;
+impl<'obj> ObjectBinding<'obj, Framebuffer> for FramebufferBinding<'obj> {
+  #[inline(always)]
+  fn object(&self) -> &Framebuffer { &self.framebuffer }
 
-  pub fn ctx(&self) -> &SharedContext { &self.framebuffer.ctx }
-  pub fn raw_gl(&self) -> &RawGL { self.framebuffer.ctx.raw_gl() }
-  pub fn framebuffer(&self) -> &Framebuffer { &self.framebuffer }
-
-  pub fn unbind_completely(self) {
+  fn unbind_completely(self) {
     self.ctx().bound_framebuffer.unbind_unconditionally(self.raw_gl());
   }
+}
+
+impl<'obj> FramebufferBinding<'obj> {
+  pub const BIND_TARGET: BindFramebufferTarget = Framebuffer::BIND_TARGET;
 
   pub fn status(&self) -> FramebufferStatus {
     FramebufferStatus::from_raw(unsafe {

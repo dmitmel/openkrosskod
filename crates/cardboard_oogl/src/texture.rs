@@ -1,5 +1,4 @@
-use crate::{RawGL, SharedContext};
-use ::gl::prelude::*;
+use crate::impl_prelude::*;
 use cardboard_math::*;
 use prelude_plus::*;
 
@@ -14,24 +13,35 @@ gl_enum!({
 pub struct Texture2D {
   ctx: SharedContext,
   addr: u32,
+  internal_state_acquired: bool,
+}
+
+impl !Send for Texture2D {}
+impl !Sync for Texture2D {}
+
+impl Object for Texture2D {
+  const DEBUG_TYPE_IDENTIFIER: GLenum = gl::TEXTURE;
+
+  #[inline(always)]
+  fn ctx(&self) -> &SharedContext { &self.ctx }
+  #[inline(always)]
+  fn addr(&self) -> u32 { self.addr }
+  #[inline(always)]
+  fn internal_state_acquired(&self) -> bool { self.internal_state_acquired }
 }
 
 impl Texture2D {
   pub const BIND_TARGET: BindTextureTarget = BindTextureTarget::Texture2D;
 
-  pub fn ctx(&self) -> &SharedContext { &self.ctx }
-  pub fn raw_gl(&self) -> &RawGL { self.ctx.raw_gl() }
-  pub fn addr(&self) -> u32 { self.addr }
-
   pub fn new(ctx: SharedContext) -> Self {
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenTextures(1, &mut addr) };
-    Self { ctx, addr }
+    Self { ctx, addr, internal_state_acquired: false }
   }
 
-  pub fn bind(&'_ mut self, unit: Option<u32>) -> Texture2DBinding<'_> {
+  pub fn bind(&'_ mut self, unit_preference: Option<u32>) -> Texture2DBinding<'_> {
     #[allow(clippy::or_fun_call)]
-    let unit = unit.unwrap_or(self.ctx.active_texture_unit.get());
+    let unit = unit_preference.unwrap_or(self.ctx.active_texture_unit.get());
     assert!(unit < self.ctx.capabilities().max_texture_units);
 
     let different_texture_was_bound = self.ctx.bound_texture_2d.bound_addr() != self.addr;
@@ -46,6 +56,7 @@ impl Texture2D {
       }
 
       self.ctx.bound_texture_2d.bind_unconditionally(gl, self.addr);
+      self.internal_state_acquired = true;
     }
     Texture2DBinding { texture: self, unit }
   }
@@ -56,22 +67,23 @@ impl Drop for Texture2D {
 }
 
 #[derive(Debug)]
-pub struct Texture2DBinding<'tex> {
-  texture: &'tex mut Texture2D,
+pub struct Texture2DBinding<'obj> {
+  texture: &'obj mut Texture2D,
   unit: u32,
 }
 
-impl<'tex> Texture2DBinding<'tex> {
+impl<'obj> ObjectBinding<'obj, Texture2D> for Texture2DBinding<'obj> {
+  #[inline(always)]
+  fn object(&self) -> &Texture2D { &self.texture }
+
+  fn unbind_completely(self) { self.ctx().bound_texture_2d.unbind_unconditionally(self.raw_gl()); }
+}
+
+impl<'obj> Texture2DBinding<'obj> {
   pub const BIND_TARGET: BindTextureTarget = Texture2D::BIND_TARGET;
 
-  pub fn ctx(&self) -> &SharedContext { &self.texture.ctx }
-  pub fn raw_gl(&self) -> &RawGL { self.texture.ctx.raw_gl() }
-  pub fn texture(&self) -> &Texture2D { &self.texture }
+  #[inline(always)]
   pub fn unit(&self) -> u32 { self.unit }
-
-  pub fn unbind_completely(self) {
-    self.ctx().bound_framebuffer.unbind_unconditionally(self.raw_gl());
-  }
 
   pub fn generate_mipmap(&self) {
     unsafe { self.raw_gl().GenerateMipmap(Self::BIND_TARGET.as_raw()) };

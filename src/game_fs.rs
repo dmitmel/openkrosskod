@@ -17,8 +17,7 @@ impl GameFs {
         return Ok(Self { installation_dir, assets_dir });
       }
     }
-    // bail!("Failed to find the installation directory")
-    Ok(Self { installation_dir: PathBuf::from("."), assets_dir: PathBuf::from("./assets") })
+    bail!("Failed to find the installation directory")
   }
 
   pub fn open_file<P: AsRef<Path>>(&self, relative_path: P) -> AnyResult<File> {

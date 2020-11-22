@@ -67,6 +67,9 @@ where
   }
 }
 
+// TODO: Rewrite to capture all of the primitive cast semantics, including
+// identity casts (which would have disallow implementing this trait by generic
+// types) and seal this trait.
 pub trait NumCastFrom<T>: Sized {
   fn cast_from(_: T) -> Self;
 }

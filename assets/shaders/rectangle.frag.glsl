@@ -1,3 +1,5 @@
+#version 100
+
 #ifdef GL_ES
 precision highp float;
 #endif
@@ -9,7 +11,5 @@ varying vec2 v_texcoord;
 
 void main(void) {
   gl_FragColor = u_color * texture2D(u_tex, v_texcoord);
-  // if (gl_FragColor.a == 0.0) {
-  //   discard;
-  // }
+  // if (gl_FragColor.a == 0.0) discard;
 }

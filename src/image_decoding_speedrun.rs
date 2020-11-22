@@ -184,7 +184,7 @@ pub fn multi_threaded_main() -> AssetsMap {
 
   let jobs_count = num_cpus::get();
   let jobs: Vec<_> = (0..jobs_count)
-    .map(|i| asset_loading_job(i, assets.clone(), decoding_requests_recv_locked.clone()))
+    .map(|i| asset_loading_job(i, Arc::clone(&assets), Arc::clone(&decoding_requests_recv_locked)))
     .collect();
 
   for path in asset_paths {

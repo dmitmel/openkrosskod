@@ -149,9 +149,9 @@ macro_rules! impl_vec2 {
   ($ty:ty) => {
     impl Vec2<$ty> {
       #[inline]
-      pub fn sqr_length(self) -> $ty { self.x * self.x + self.y * self.y }
+      pub fn sqr_magnitude(self) -> $ty { self.x * self.x + self.y * self.y }
       #[inline]
-      pub fn sqr_distance(self, rhs: Self) -> $ty { (rhs - self).sqr_length() }
+      pub fn sqr_distance(self, rhs: Self) -> $ty { (rhs - self).sqr_magnitude() }
       #[inline]
       pub fn dot(self, rhs: Self) -> $ty { self.x * rhs.x + self.y * rhs.y }
 
@@ -162,6 +162,11 @@ macro_rules! impl_vec2 {
       #[inline]
       pub fn max_component(self, rhs: Self) -> Self {
         Self { x: self.x.max(rhs.x), y: self.y.max(rhs.y) }
+      }
+
+      #[inline]
+      pub fn reflect_normal(self, normal: Self) -> Self {
+        self - (2 as $ty) * self.dot(normal) * normal
       }
     }
 
@@ -190,6 +195,13 @@ macro_rules! impl_vec2 {
     impl_vec2!($ty);
     impl_vec2_operator!(unary, $ty, Neg, fn neg(a) { Vec2 { x: -a.x, y: -a.y } });
 
+    impl Vec2<$ty> {
+      #[inline]
+      pub fn abs(self) -> Self { Self { x: self.x.abs(), y: self.y.abs() } }
+      #[inline]
+      pub fn signum(self) -> Self { Self { x: self.x.signum(), y: self.y.signum() } }
+    }
+
     impl Clamp2Abs<$ty> for Vec2<$ty> {
       type Output = Self;
       #[inline]
@@ -211,14 +223,26 @@ macro_rules! impl_vec2 {
       pub const ZERO: Vec2<$ty> = vec2(0.0, 0.0);
 
       #[inline]
-      pub fn length(self) -> $ty { self.sqr_length().sqrt() }
+      pub fn magnitude(self) -> $ty { self.sqr_magnitude().sqrt() }
       #[inline]
       pub fn distance(self, rhs: Self) -> $ty { self.sqr_distance(rhs).sqrt() }
       #[inline]
-      pub fn normalize(self) -> Self { self / self.length() }
+      pub fn normalized(self) -> Self { self / self.magnitude() }
+      #[inline]
+      pub fn direction(self, towards: Self) -> Self { (self - towards).normalized() }
 
       #[inline]
-      pub fn abs(self) -> Self { Self { x: self.x.abs(), y: self.y.abs() } }
+      pub fn clamp_magnitude(self, max_magnitude: $ty) -> Self {
+        let sqr_magnitude = self.sqr_magnitude();
+        if sqr_magnitude > max_magnitude * max_magnitude {
+          self.normalized() * max_magnitude
+        } else {
+          self
+        }
+      }
+
+      #[inline]
+      pub fn angle(self) -> $ty { self.y.atan2(self.x) }
     }
   };
 }

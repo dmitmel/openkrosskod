@@ -1,5 +1,4 @@
-use crate::{ProgramBinding, RawGL, SharedContext, INACTIVE_ATTRIBUTE_LOCATION};
-use ::gl::prelude::*;
+use crate::impl_prelude::*;
 use prelude_plus::*;
 
 gl_enum!({
@@ -13,19 +12,33 @@ gl_enum!({
 pub struct VertexBuffer<T> {
   ctx: SharedContext,
   addr: u32,
+  internal_state_acquired: bool,
   attributes: Vec<AttributePtr>,
   stride: u32,
   phantom: PhantomData<*mut T>,
 }
 
+impl<T> !Send for VertexBuffer<T> {}
+impl<T> !Sync for VertexBuffer<T> {}
+
+impl<T> Object for VertexBuffer<T> {
+  const DEBUG_TYPE_IDENTIFIER: GLenum = gl::BUFFER;
+
+  #[inline(always)]
+  fn ctx(&self) -> &SharedContext { &self.ctx }
+  #[inline(always)]
+  fn addr(&self) -> u32 { self.addr }
+  #[inline(always)]
+  fn internal_state_acquired(&self) -> bool { self.internal_state_acquired }
+}
+
 impl<T> VertexBuffer<T> {
   pub const BIND_TARGET: BindBufferTarget = BindBufferTarget::Vertex;
 
-  pub fn ctx(&self) -> &SharedContext { &self.ctx }
-  pub fn raw_gl(&self) -> &RawGL { self.ctx.raw_gl() }
-  pub fn addr(&self) -> u32 { self.addr }
+  #[inline(always)]
   pub fn attributes(&self) -> &[AttributePtr] { &self.attributes }
-  pub fn stride(&self) -> &u32 { &self.stride }
+  #[inline(always)]
+  pub fn stride(&self) -> u32 { self.stride }
 
   pub fn new(ctx: SharedContext, attributes: Vec<AttributePtr>) -> Self {
     let mut stride = 0;
@@ -39,11 +52,15 @@ impl<T> VertexBuffer<T> {
 
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenBuffers(1, &mut addr) };
-    Self { ctx, addr, attributes, stride, phantom: PhantomData }
+    Self { ctx, addr, internal_state_acquired: false, attributes, stride, phantom: PhantomData }
   }
 
   pub fn bind(&mut self) -> VertexBufferBinding<'_, T> {
-    self.ctx.bound_vertex_buffer.bind_if_needed(self.ctx.raw_gl(), self.addr);
+    self.ctx.bound_vertex_buffer.bind_if_needed(
+      self.ctx.raw_gl(),
+      self.addr,
+      &mut self.internal_state_acquired,
+    );
     VertexBufferBinding { buffer: self }
   }
 }
@@ -53,20 +70,21 @@ impl<T> Drop for VertexBuffer<T> {
 }
 
 #[derive(Debug)]
-pub struct VertexBufferBinding<'buf, T> {
-  buffer: &'buf mut VertexBuffer<T>,
+pub struct VertexBufferBinding<'obj, T> {
+  buffer: &'obj mut VertexBuffer<T>,
 }
 
-impl<'buf, T> VertexBufferBinding<'buf, T> {
-  pub const BIND_TARGET: BindBufferTarget = VertexBuffer::<()>::BIND_TARGET;
+impl<'obj, T> ObjectBinding<'obj, VertexBuffer<T>> for VertexBufferBinding<'obj, T> {
+  #[inline(always)]
+  fn object(&self) -> &VertexBuffer<T> { &self.buffer }
 
-  pub fn ctx(&self) -> &SharedContext { &self.buffer.ctx }
-  pub fn raw_gl(&self) -> &RawGL { self.buffer.ctx.raw_gl() }
-  pub fn buffer(&self) -> &VertexBuffer<T> { &self.buffer }
-
-  pub fn unbind_completely(self) {
+  fn unbind_completely(self) {
     self.ctx().bound_vertex_buffer.unbind_unconditionally(self.raw_gl());
   }
+}
+
+impl<'obj, T> VertexBufferBinding<'obj, T> {
+  pub const BIND_TARGET: BindBufferTarget = VertexBuffer::<()>::BIND_TARGET;
 
   pub fn set_data(&self, data: &[T], usage_hint: BufferUsageHint) {
     // assert_eq!((data.len() * mem::size_of::<T>()) % self.buffer.stride as usize, 0);
@@ -119,7 +137,7 @@ impl<'buf, T> VertexBufferBinding<'buf, T> {
 
   pub fn draw(
     &self,
-    _program_binding: &ProgramBinding,
+    _program_binding: &crate::ProgramBinding,
     mode: DrawPrimitive,
     start: u32,
     count: u32,
@@ -139,24 +157,39 @@ impl<'buf, T> VertexBufferBinding<'buf, T> {
 pub struct ElementBuffer<T: ElementBufferType> {
   ctx: SharedContext,
   addr: u32,
+  internal_state_acquired: bool,
   phantom: PhantomData<*mut T>,
+}
+
+impl<T: ElementBufferType> !Send for ElementBuffer<T> {}
+impl<T: ElementBufferType> !Sync for ElementBuffer<T> {}
+
+impl<T: ElementBufferType> Object for ElementBuffer<T> {
+  const DEBUG_TYPE_IDENTIFIER: GLenum = gl::BUFFER;
+
+  #[inline(always)]
+  fn ctx(&self) -> &SharedContext { &self.ctx }
+  #[inline(always)]
+  fn addr(&self) -> u32 { self.addr }
+  #[inline(always)]
+  fn internal_state_acquired(&self) -> bool { self.internal_state_acquired }
 }
 
 impl<T: ElementBufferType> ElementBuffer<T> {
   pub const BIND_TARGET: BindBufferTarget = BindBufferTarget::Element;
 
-  pub fn ctx(&self) -> &SharedContext { &self.ctx }
-  pub fn raw_gl(&self) -> &RawGL { self.ctx.raw_gl() }
-  pub fn addr(&self) -> u32 { self.addr }
-
   pub fn new(ctx: SharedContext) -> Self {
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenBuffers(1, &mut addr) };
-    Self { ctx, addr, phantom: PhantomData }
+    Self { ctx, addr, internal_state_acquired: false, phantom: PhantomData }
   }
 
   pub fn bind(&mut self) -> ElementBufferBinding<'_, T> {
-    self.ctx.bound_element_buffer.bind_if_needed(self.ctx.raw_gl(), self.addr);
+    self.ctx.bound_element_buffer.bind_if_needed(
+      self.ctx.raw_gl(),
+      self.addr,
+      &mut self.internal_state_acquired,
+    );
     ElementBufferBinding { buffer: self }
   }
 }
@@ -166,20 +199,24 @@ impl<T: ElementBufferType> Drop for ElementBuffer<T> {
 }
 
 #[derive(Debug)]
-pub struct ElementBufferBinding<'buf, T: ElementBufferType> {
-  buffer: &'buf mut ElementBuffer<T>,
+pub struct ElementBufferBinding<'obj, T: ElementBufferType> {
+  buffer: &'obj mut ElementBuffer<T>,
 }
 
-impl<'buf, T: ElementBufferType> ElementBufferBinding<'buf, T> {
-  const BIND_TARGET: BindBufferTarget = ElementBuffer::<u8>::BIND_TARGET;
+impl<'obj, T> ObjectBinding<'obj, ElementBuffer<T>> for ElementBufferBinding<'obj, T>
+where
+  T: ElementBufferType,
+{
+  #[inline(always)]
+  fn object(&self) -> &ElementBuffer<T> { &self.buffer }
 
-  pub fn ctx(&self) -> &SharedContext { &self.buffer.ctx }
-  pub fn raw_gl(&self) -> &RawGL { self.buffer.ctx.raw_gl() }
-  pub fn buffer(&self) -> &ElementBuffer<T> { &self.buffer }
-
-  pub fn unbind_completely(self) {
+  fn unbind_completely(self) {
     self.ctx().bound_element_buffer.unbind_unconditionally(self.raw_gl());
   }
+}
+
+impl<'obj, T: ElementBufferType> ElementBufferBinding<'obj, T> {
+  const BIND_TARGET: BindBufferTarget = ElementBuffer::<u8>::BIND_TARGET;
 
   pub fn set_data(&self, data: &[T], usage_hint: BufferUsageHint) {
     unsafe { set_buffer_data(self.ctx(), Self::BIND_TARGET, data, usage_hint) };
@@ -187,7 +224,7 @@ impl<'buf, T: ElementBufferType> ElementBufferBinding<'buf, T> {
 
   pub fn draw(
     &self,
-    _program_binding: &ProgramBinding,
+    _program_binding: &crate::ProgramBinding,
     mode: DrawPrimitive,
     start: u32,
     count: u32,
@@ -273,7 +310,7 @@ pub struct AttributePtr {
 
 impl AttributePtr {
   pub fn location(&self) -> u32 { self.location }
-  pub fn is_active(&self) -> bool { self.location != INACTIVE_ATTRIBUTE_LOCATION }
+  pub fn is_active(&self) -> bool { self.location != crate::INACTIVE_ATTRIBUTE_LOCATION }
   pub fn config(&self) -> &AttributePtrConfig { &self.config }
   pub fn size(&self) -> u16 { self.size }
 

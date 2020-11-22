@@ -1,6 +1,5 @@
-use crate::{RawGL, SharedContext};
-use ::gl::prelude::*;
-use cardboard_math::{Color, Vec2};
+use crate::impl_prelude::*;
+use cardboard_math::*;
 use prelude_plus::*;
 
 gl_enum!({
@@ -20,10 +19,19 @@ pub struct Shader {
 impl !Send for Shader {}
 impl !Sync for Shader {}
 
+impl Object for Shader {
+  const DEBUG_TYPE_IDENTIFIER: GLenum = gl::SHADER;
+
+  #[inline(always)]
+  fn ctx(&self) -> &SharedContext { &self.ctx }
+  #[inline(always)]
+  fn addr(&self) -> u32 { self.addr }
+  #[inline(always)]
+  fn internal_state_acquired(&self) -> bool { true }
+}
+
 impl Shader {
-  pub fn ctx(&self) -> &SharedContext { &self.ctx }
-  pub fn raw_gl(&self) -> &RawGL { self.ctx.raw_gl() }
-  pub fn addr(&self) -> u32 { self.addr }
+  #[inline(always)]
   pub fn type_(&self) -> ShaderType { self.type_ }
 
   pub fn new(ctx: SharedContext, type_: ShaderType) -> Self {
@@ -50,14 +58,14 @@ impl Shader {
   pub fn get_info_log(&self) -> Vec<u8> {
     let gl = self.raw_gl();
 
-    let mut buf_len = 0 as GLint;
-    unsafe { gl.GetShaderiv(self.addr, gl::INFO_LOG_LENGTH, &mut buf_len) };
-    let mut buf: Vec<u8> = Vec::with_capacity(buf_len as usize);
+    let mut buf_size = 0 as GLint;
+    unsafe { gl.GetShaderiv(self.addr, gl::INFO_LOG_LENGTH, &mut buf_size) };
+    let mut buf: Vec<u8> = Vec::with_capacity(buf_size as usize);
 
-    if buf_len != 0 {
+    if buf_size != 0 {
       let mut text_len = 0 as GLint;
       unsafe {
-        gl.GetShaderInfoLog(self.addr, buf_len, &mut text_len, buf.as_mut_ptr() as *mut GLchar);
+        gl.GetShaderInfoLog(self.addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut GLchar);
         buf.set_len(text_len as usize);
       }
     }
@@ -82,18 +90,25 @@ impl !Sync for Program {}
 pub const INACTIVE_UNIFORM_LOCATION: i32 = -1;
 pub const INACTIVE_ATTRIBUTE_LOCATION: u32 = -1i32 as u32;
 
-impl Program {
-  pub fn ctx(&self) -> &SharedContext { &self.ctx }
-  pub fn raw_gl(&self) -> &RawGL { self.ctx.raw_gl() }
-  pub fn addr(&self) -> u32 { self.addr }
+impl Object for Program {
+  const DEBUG_TYPE_IDENTIFIER: GLenum = gl::PROGRAM;
 
+  #[inline(always)]
+  fn ctx(&self) -> &SharedContext { &self.ctx }
+  #[inline(always)]
+  fn addr(&self) -> u32 { self.addr }
+  #[inline(always)]
+  fn internal_state_acquired(&self) -> bool { true }
+}
+
+impl Program {
   pub fn new(ctx: SharedContext) -> Self {
     let addr = unsafe { ctx.raw_gl().CreateProgram() };
     Self { ctx, addr }
   }
 
   pub fn bind(&'_ mut self) -> ProgramBinding<'_> {
-    self.ctx.bound_program.bind_if_needed(self.ctx.raw_gl(), self.addr);
+    self.ctx.bound_program.bind_if_needed(self.ctx.raw_gl(), self.addr, &mut false);
     ProgramBinding { program: self }
   }
 
@@ -117,14 +132,14 @@ impl Program {
   pub fn get_info_log(&self) -> Vec<u8> {
     let gl = self.raw_gl();
 
-    let mut buf_len = 0 as GLint;
-    unsafe { gl.GetProgramiv(self.addr, gl::INFO_LOG_LENGTH, &mut buf_len) };
-    let mut buf: Vec<u8> = Vec::with_capacity(buf_len as usize);
+    let mut buf_size = 0 as GLint;
+    unsafe { gl.GetProgramiv(self.addr, gl::INFO_LOG_LENGTH, &mut buf_size) };
+    let mut buf: Vec<u8> = Vec::with_capacity(buf_size as usize);
 
-    if buf_len != 0 {
+    if buf_size != 0 {
       let mut text_len = 0 as GLint;
       unsafe {
-        gl.GetProgramInfoLog(self.addr, buf_len, &mut text_len, buf.as_mut_ptr() as *mut GLchar);
+        gl.GetProgramInfoLog(self.addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut GLchar);
         buf.set_len(text_len as usize);
       }
     }
@@ -142,6 +157,7 @@ impl Program {
     let gl = self.raw_gl();
     let location = self.get_uniform_location(name);
 
+    // TODO: Add type checking assertions based on the generic T parameter
     let data_type: Option<(UniformType, u32)> = if location != INACTIVE_UNIFORM_LOCATION {
       let mut data_type = 0;
       let mut data_array_len = 0;
@@ -181,10 +197,11 @@ impl Program {
     unsafe { gl.GetAttribLocation(self.addr, c_name.as_ptr()) as u32 }
   }
 
-  pub fn get_attribute(&self, name: &[u8]) -> Attribute {
+  pub fn get_attribute<T>(&self, name: &[u8]) -> Attribute<T> {
     let gl = self.raw_gl();
     let location = self.get_attribute_location(name);
 
+    // TODO: See get_uniform
     let data_type: Option<(AttributeType, u32)> = if location != INACTIVE_ATTRIBUTE_LOCATION {
       let mut data_type = 0;
       let mut data_array_len = 0;
@@ -215,7 +232,7 @@ impl Program {
       None
     };
 
-    Attribute { location, program_addr: self.addr, data_type }
+    Attribute { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
 }
 
@@ -224,18 +241,15 @@ impl Drop for Program {
 }
 
 #[derive(Debug)]
-pub struct ProgramBinding<'program> {
-  program: &'program mut Program,
+pub struct ProgramBinding<'obj> {
+  program: &'obj mut Program,
 }
 
-impl<'program> ProgramBinding<'program> {
-  pub fn ctx(&self) -> &SharedContext { &self.program.ctx }
-  pub fn raw_gl(&self) -> &RawGL { self.program.ctx.raw_gl() }
-  pub fn program(&self) -> &Program { &self.program }
+impl<'obj> ObjectBinding<'obj, Program> for ProgramBinding<'obj> {
+  #[inline(always)]
+  fn object(&self) -> &Program { &self.program }
 
-  pub fn unbind_completely(self) {
-    self.ctx().bound_program.unbind_unconditionally(self.raw_gl());
-  }
+  fn unbind_completely(self) { self.ctx().bound_program.unbind_unconditionally(self.raw_gl()); }
 }
 
 #[derive(Debug)]
@@ -250,10 +264,17 @@ impl<T> !Send for Uniform<T> {}
 impl<T> !Sync for Uniform<T> {}
 
 impl<T> Uniform<T> {
+  #[inline(always)]
   pub fn location(&self) -> i32 { self.location }
+  #[inline(always)]
   pub fn is_active(&self) -> bool { self.location != INACTIVE_UNIFORM_LOCATION }
+  #[inline(always)]
   pub fn program_addr(&self) -> u32 { self.program_addr }
+  #[inline(always)]
   pub fn data_type(&self) -> &Option<(UniformType, u32)> { &self.data_type }
+
+  #[inline(always)]
+  pub fn reflect_from(program: &Program, name: &[u8]) -> Self { program.get_uniform(name) }
 }
 
 macro_rules! impl_set_uniform {
@@ -319,22 +340,29 @@ impl UniformType {
 }
 
 #[derive(Debug)]
-pub struct Attribute {
+pub struct Attribute<T> {
   location: u32,
   program_addr: u32,
   data_type: Option<(AttributeType, u32)>,
+  phantom: PhantomData<*mut T>,
 }
 
-impl !Send for Attribute {}
-impl !Sync for Attribute {}
+impl<T> !Send for Attribute<T> {}
+impl<T> !Sync for Attribute<T> {}
 
-impl Attribute {
+impl<T> Attribute<T> {
+  #[inline(always)]
   pub fn location(&self) -> u32 { self.location }
+  #[inline(always)]
   pub fn is_active(&self) -> bool { self.location != INACTIVE_ATTRIBUTE_LOCATION }
+  #[inline(always)]
   pub fn program_addr(&self) -> u32 { self.program_addr }
+  #[inline(always)]
   pub fn data_type(&self) -> &Option<(AttributeType, u32)> { &self.data_type }
 
   #[inline(always)]
+  pub fn reflect_from(program: &Program, name: &[u8]) -> Self { program.get_attribute(name) }
+
   pub fn to_pointer(&self, config: crate::AttributePtrConfig) -> crate::AttributePtr {
     if let Some((data_type, data_array_len)) = self.data_type {
       assert_eq!(config.len as u32, data_type.components() as u32 * data_array_len);
@@ -364,4 +392,30 @@ impl AttributeType {
       Self::Vec4 => 4,
     }
   }
+}
+
+#[macro_export]
+macro_rules! program_reflection_block {
+  // a wrapper for autoformatting purposes
+  ({$($tt:tt)+}) => { $crate::program_reflection_block! { $($tt)+ } };
+
+  (
+    $(#[$struct_meta:meta])* $enum_visibility:vis struct $struct_name:ident {
+      $($(#[$field_meta:meta])* $field_visibility:vis $field_name:ident: $field_type:ty),+ $(,)?
+    }
+  ) => {
+    $(#[$struct_meta])*
+    $enum_visibility struct $struct_name {
+      $($(#[$field_meta])* $field_visibility $field_name: $field_type),+
+    }
+
+    impl $struct_name {
+      $enum_visibility fn new(program: &$crate::Program) -> Self {
+        Self {
+          $($field_name: <$field_type>::reflect_from(
+            program, stringify!($field_name).as_bytes())),+
+        }
+      }
+    }
+  };
 }
