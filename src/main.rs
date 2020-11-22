@@ -494,7 +494,7 @@ impl Game {
             *current_collider = Some(racket.coll.id);
 
             if coll_dir_magnitude > 0.0 {
-              ball.coll.vel = ball.coll.vel.reflect_normal(coll_dir / coll_dir_magnitude);
+              ball.coll.vel = ball.coll.vel.reflected_normal(coll_dir / coll_dir_magnitude);
             } else {
               todo!();
             }
@@ -560,7 +560,7 @@ impl Game {
 
     // TODO: remove
     for (start_point, vector, color) in self.debug_vectors.drain(..) {
-      let angle = vector.angle();
+      let angle = vector.angle_from_x_axis();
 
       self.renderer.draw_shape(&mut Shape {
         type_: ShapeType::Rectangle,

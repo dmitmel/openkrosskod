@@ -148,6 +148,12 @@ macro_rules! impl_vec2_operator {
 macro_rules! impl_vec2 {
   ($ty:ty) => {
     impl Vec2<$ty> {
+      pub const ONE: Self = vec2(1 as _, 1 as _);
+      pub const ZERO: Self = vec2(0 as _, 0 as _);
+
+      #[inline]
+      pub fn is_zero(self) -> bool { self == Self::ZERO }
+
       #[inline]
       pub fn sqr_magnitude(self) -> $ty { self.x * self.x + self.y * self.y }
       #[inline]
@@ -156,25 +162,25 @@ macro_rules! impl_vec2 {
       pub fn dot(self, rhs: Self) -> $ty { self.x * rhs.x + self.y * rhs.y }
 
       #[inline]
-      pub fn min_component(self, rhs: Self) -> Self {
+      pub fn min_components(self, rhs: Self) -> Self {
         Self { x: self.x.min(rhs.x), y: self.y.min(rhs.y) }
       }
       #[inline]
-      pub fn max_component(self, rhs: Self) -> Self {
+      pub fn max_components(self, rhs: Self) -> Self {
         Self { x: self.x.max(rhs.x), y: self.y.max(rhs.y) }
       }
 
       #[inline]
-      pub fn reflect_normal(self, normal: Self) -> Self {
+      pub fn reflected_normal(self, normal: Self) -> Self {
         self - (2 as $ty) * self.dot(normal) * normal
       }
     }
 
-    impl_vec2_operator!(binary, $ty, Add, fn add(a, b) { Vec2 { x: a.x + b.x, y: a.y + b.y } });
-    impl_vec2_operator!(binary, $ty, Sub, fn sub(a, b) { Vec2 { x: a.x - b.x, y: a.y - b.y } });
-    impl_vec2_operator!(binary, $ty, Mul, fn mul(a, b) { Vec2 { x: a.x * b.x, y: a.y * b.y } });
-    impl_vec2_operator!(binary, $ty, Div, fn div(a, b) { Vec2 { x: a.x / b.x, y: a.y / b.y } });
-    impl_vec2_operator!(binary, $ty, Rem, fn rem(a, b) { Vec2 { x: a.x % b.x, y: a.y % b.y } });
+    impl_vec2_operator!(binary, $ty, Add, fn add(a, b) { Self { x: a.x + b.x, y: a.y + b.y } });
+    impl_vec2_operator!(binary, $ty, Sub, fn sub(a, b) { Self { x: a.x - b.x, y: a.y - b.y } });
+    impl_vec2_operator!(binary, $ty, Mul, fn mul(a, b) { Self { x: a.x * b.x, y: a.y * b.y } });
+    impl_vec2_operator!(binary, $ty, Div, fn div(a, b) { Self { x: a.x / b.x, y: a.y / b.y } });
+    impl_vec2_operator!(binary, $ty, Rem, fn rem(a, b) { Self { x: a.x % b.x, y: a.y % b.y } });
 
     impl_vec2_operator!(binary_assign, $ty, AddAssign, fn add_assign(a, b) { a.x += b.x; a.y += b.y; });
     impl_vec2_operator!(binary_assign, $ty, SubAssign, fn sub_assign(a, b) { a.x -= b.x; a.y -= b.y; });
@@ -193,20 +199,33 @@ macro_rules! impl_vec2 {
 
   ($ty:ty, signed) => {
     impl_vec2!($ty);
-    impl_vec2_operator!(unary, $ty, Neg, fn neg(a) { Vec2 { x: -a.x, y: -a.y } });
+    impl_vec2_operator!(unary, $ty, Neg, fn neg(a) { Self { x: -a.x, y: -a.y } });
 
     impl Vec2<$ty> {
+      pub const UP: Self = vec2(0 as _, 1 as _);
+      pub const RIGHT: Self = vec2(1 as _, 0 as _);
+      pub const DOWN: Self = vec2(0 as _, -1 as _);
+      pub const LEFT: Self = vec2(-1 as _, 0 as _);
+
       #[inline]
       pub fn abs(self) -> Self { Self { x: self.x.abs(), y: self.y.abs() } }
       #[inline]
       pub fn signum(self) -> Self { Self { x: self.x.signum(), y: self.y.signum() } }
+
+      #[inline]
+      pub fn perpendicular_cw(self) -> Self { Self { x: self.y, y: -self.x } }
+      #[inline]
+      pub fn perpendicular_ccw(self) -> Self { Self { x: -self.y, y: self.x } }
+
+      #[inline]
+      pub fn rotation_sign(self, rhs: Self) -> $ty { (self.x * rhs.y - self.y * rhs.x).signum() }
     }
 
     impl Clamp2Abs<$ty> for Vec2<$ty> {
       type Output = Self;
       #[inline]
       fn clamp2_abs(self, max: $ty) -> Self::Output {
-        Vec2 { x: self.x.clamp2_abs(max), y: self.y.clamp2_abs(max) }
+        Self { x: self.x.clamp2_abs(max), y: self.y.clamp2_abs(max) }
       }
     }
   };
@@ -215,36 +234,67 @@ macro_rules! impl_vec2 {
     impl_vec2!($ty, signed);
 
     impl Vec2<$ty> {
-      pub const UP: Vec2<$ty> = vec2(0.0, 1.0);
-      pub const RIGHT: Vec2<$ty> = vec2(1.0, 0.0);
-      pub const DOWN: Vec2<$ty> = vec2(0.0, -1.0);
-      pub const LEFT: Vec2<$ty> = vec2(-1.0, 0.0);
-      pub const ONE: Vec2<$ty> = vec2(1.0, 1.0);
-      pub const ZERO: Vec2<$ty> = vec2(0.0, 0.0);
-
       #[inline]
       pub fn magnitude(self) -> $ty { self.sqr_magnitude().sqrt() }
       #[inline]
       pub fn distance(self, rhs: Self) -> $ty { self.sqr_distance(rhs).sqrt() }
-      #[inline]
-      pub fn normalized(self) -> Self { self / self.magnitude() }
-      #[inline]
-      pub fn direction(self, towards: Self) -> Self { (self - towards).normalized() }
 
       #[inline]
-      pub fn clamp_magnitude(self, max_magnitude: $ty) -> Self {
-        let sqr_magnitude = self.sqr_magnitude();
-        if sqr_magnitude > max_magnitude * max_magnitude {
-          self.normalized() * max_magnitude
+      pub fn normalized(self) -> Self {
+        let mag = self.magnitude();
+        if mag != 0.0 {
+          self / mag
         } else {
           self
         }
       }
 
       #[inline]
-      pub fn angle(self) -> $ty { self.y.atan2(self.x) }
+      pub fn direction(self, towards: Self) -> Self { (self - towards).normalized() }
 
-      // TODO: Add more rotation- and angle-related functions
+      #[inline]
+      pub fn with_magnitude(self, magnitude: $ty) -> Self { self.normalized() * magnitude }
+      #[inline]
+      pub fn clamp_magnitude(self, max_magnitude: $ty) -> Self {
+        let sqr_magnitude = self.sqr_magnitude();
+        if sqr_magnitude > max_magnitude * max_magnitude {
+          self.with_magnitude(max_magnitude)
+        } else {
+          self
+        }
+      }
+
+      #[inline]
+      pub fn angle_from_x_axis(self) -> $ty { self.y.atan2(self.x) }
+
+      #[inline]
+      pub fn angle_normalized(self, rhs: Self) -> $ty { self.dot(rhs).clamp2(-1.0, 1.0).acos() }
+      #[inline]
+      pub fn signed_angle_normalized(self, rhs: Self) -> $ty {
+        self.angle_normalized(rhs) * self.rotation_sign(rhs)
+      }
+
+      #[inline]
+      pub fn angle(self, rhs: Self) -> $ty {
+        let mag = (self.sqr_magnitude() * rhs.sqr_magnitude()).sqrt();
+        if mag != 0.0 {
+          (self.dot(rhs) / mag).clamp2(-1.0, 1.0).acos()
+        } else {
+          0.0
+        }
+      }
+      #[inline]
+      pub fn signed_angle(self, rhs: Self) -> $ty { self.angle(rhs) * self.rotation_sign(rhs) }
+
+      #[inline]
+      pub fn rotate(self, angle: $ty) -> Self {
+        let s = angle.sin();
+        let c = angle.cos();
+        Self {
+          x: c * self.x - s * self.y,
+          y: s * self.x + c * self.y,
+        }
+      }
     }
   };
 }
@@ -296,7 +346,7 @@ where
 {
   type Output = Self;
   #[inline]
-  fn lerp(self, rhs: Self, t: T) -> Self::Output { self.lerp(rhs, Vec2 { x: t, y: t }) }
+  fn lerp(self, rhs: Self, t: T) -> Self::Output { self.lerp(rhs, Self { x: t, y: t }) }
 }
 
 impl<T> Clamp2 for Vec2<T>
@@ -306,7 +356,7 @@ where
   type Output = Self;
   #[inline]
   fn clamp2(self, min: Self, max: Self) -> Self::Output {
-    Vec2 { x: self.x.clamp2(min.x, max.x), y: self.y.clamp2(min.y, max.y) }
+    Self { x: self.x.clamp2(min.x, max.x), y: self.y.clamp2(min.y, max.y) }
   }
 }
 
@@ -318,7 +368,7 @@ where
   type Output = Self;
   #[inline]
   fn clamp2(self, min: T, max: T) -> Self::Output {
-    self.clamp2(Vec2 { x: min, y: min }, Vec2 { x: max, y: max })
+    self.clamp2(Self { x: min, y: min }, Self { x: max, y: max })
   }
 }
 
