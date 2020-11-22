@@ -1,55 +1,47 @@
 macro_rules! gl_enum {
+  // a wrapper for autoformatting purposes
+  ({$($tt:tt)+}) => { gl_enum! { $($tt)+ } };
+
   (
-    $(#[$meta_outer:meta])*
-    $visibility:vis enum $enum_name:ident {
-      $(
-        $(#[$meta_inner:meta])*
-        $rust_variant:ident = $gl_variant:ident
-      ),+ $(,)?
+    $(#[$enum_meta:meta])* $visibility:vis enum $enum_name:ident {
+      $($(#[$variant_meta:meta])* $rust_variant:ident = $gl_variant:ident),+ $(,)?
     }
   ) => {
-    $(#[$meta_outer])*
+    #[repr(u32)]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+    $(#[$enum_meta])*
     $visibility enum $enum_name {
-      $(
-        $(#[$meta_inner])*
-        $rust_variant,
-      )+
+      $($(#[$variant_meta])* $rust_variant = ::gl::$gl_variant,)+
     }
 
     impl $enum_name {
-      $visibility fn from_raw(raw: $crate::gl::types::GLenum) -> Option<Self> {
-        match raw {
-          $($crate::gl::$gl_variant => Some(Self::$rust_variant),)+
-          _ => None,
-        }
+      $visibility const VARIANTS: &'static [Self] = &[$(Self::$rust_variant),+];
+
+      // #[inline(always)] // TODO: consider inlining
+      $visibility const fn from_raw(raw: ::gl::types::GLenum) -> Option<Self> {
+        Some(match raw {
+          $(::gl::$gl_variant => Self::$rust_variant,)+
+            _ => return None,
+        })
       }
 
-      $visibility fn to_raw(&self) -> $crate::gl::types::GLenum {
-        match self {
-          $(Self::$rust_variant => $crate::gl::$gl_variant,)+
-        }
+      #[inline(always)]
+      $visibility const fn as_raw(&self) -> ::gl::types::GLenum {
+        *self as ::gl::types::GLenum
       }
     }
   };
 }
 
-pub struct BindingContext {}
-impl BindingContext {
-  pub fn new() -> BindingContext { Self {} }
-}
-
 pub mod buffer;
 pub mod context;
 pub mod debug;
+pub mod framebuffer;
 pub mod shader;
 pub mod texture;
 
-pub use buffer::{
-  BoundBuffer, BoundElementBuffer, BoundVertexBuffer, Buffer, BufferUsageHint, DrawPrimitive,
-};
-pub use context::Context;
-pub use shader::{SetUniform, Shader, ShaderProgram, ShaderType, Uniform};
-pub use texture::{
-  BoundTexture, BoundTexture2D, Texture, TextureFilter, TextureInputDataType, TextureInputFormat,
-  TextureInternalFormat, TextureWrappingMode,
-};
+pub use buffer::*;
+pub use context::*;
+pub use framebuffer::*;
+pub use shader::*;
+pub use texture::*;

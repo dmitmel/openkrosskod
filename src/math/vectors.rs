@@ -7,7 +7,9 @@ pub struct Vec2<T> {
 pub type Vec2d = Vec2<f64>;
 pub type Vec2f = Vec2<f32>;
 
+#[inline(always)]
 pub const fn vec2<T>(x: T, y: T) -> Vec2<T> { Vec2 { x, y } }
+#[inline(always)]
 pub const fn vec2n<T: Copy>(n: T) -> Vec2<T> { Vec2 { x: n, y: n } }
 
 macro_rules! define_consts {
@@ -28,6 +30,7 @@ define_consts!(f32);
 define_consts!(f64);
 
 impl<T> Vec2<T> {
+  // #[inline(always)]
   // pub fn from<U>(v: Vec2<U>) -> Self
   // where
   //   T: From<U>,
@@ -35,6 +38,7 @@ impl<T> Vec2<T> {
   //   Self { x: T::from(v.x), y: T::from(v.y) }
   // }
 
+  // #[inline(always)]
   // pub fn into<U>(self) -> Vec2<U>
   // where
   //   T: Into<U>,
@@ -56,10 +60,12 @@ impl<T> Vec2<T> {
   //   Ok(Vec2 { x: T::try_into(self.x)?, y: T::try_into(self.y)? })
   // }
 
+  #[inline(always)]
   pub fn map<U, F: FnMut(T) -> U>(self, mut op: F) -> Vec2<U> {
     Vec2 { x: op(self.x), y: op(self.y) }
   }
 
+  #[inline(always)]
   pub fn sqr_length(self) -> T
   where
     T: Add<Output = T> + Mul<Output = T> + Copy,
@@ -67,6 +73,7 @@ impl<T> Vec2<T> {
     self.x * self.x + self.y * self.y
   }
 
+  #[inline(always)]
   pub fn sqr_distance(self, rhs: Self) -> T
   where
     T: Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Copy,
@@ -74,6 +81,7 @@ impl<T> Vec2<T> {
     (rhs - self).sqr_length()
   }
 
+  #[inline(always)]
   pub fn dot(self, rhs: Self) -> T
   where
     T: Add<Output = T> + Mul<Output = T>,
@@ -85,19 +93,27 @@ impl<T> Vec2<T> {
 macro_rules! impl_float {
   ($ty:ident, [$(($cast_to_type:ident, $cast_fn_name:ident)),+]) => {
     impl Vec2<$ty> {
-      $(pub fn $cast_fn_name(self) -> Vec2<$cast_to_type> {
-        Vec2 { x: self.x as $cast_to_type, y: self.y as $cast_to_type }
-      })+
+      $(
+        #[inline(always)]
+        pub fn $cast_fn_name(self) -> Vec2<$cast_to_type> {
+          Vec2 { x: self.x as $cast_to_type, y: self.y as $cast_to_type }
+        }
+      )+
 
+      #[inline(always)]
       pub fn min_components(self, rhs: Self) -> Self {
         Self { x: self.x.min(rhs.x), y: self.y.min(rhs.y) }
       }
 
+      #[inline(always)]
       pub fn max_components(self, rhs: Self) -> Self {
         Self { x: self.x.max(rhs.x), y: self.y.max(rhs.y) }
       }
 
+      #[inline(always)]
       pub fn length(self) -> $ty { self.sqr_length().sqrt() }
+
+      #[inline(always)]
       pub fn distance(self, rhs: Self) -> $ty { self.sqr_distance(rhs).sqrt() }
 
       pub fn normalize(self) -> Self {
@@ -116,18 +132,36 @@ impl_float!(f64, [(f32, as_f32)]);
 impl_float!(f32, [(f64, as_f64)]);
 
 impl<T> From<(T, T)> for Vec2<T> {
+  #[inline(always)]
   fn from((x, y): (T, T)) -> Self { Self { x, y } }
 }
 
+impl<T> From<[T; 2]> for Vec2<T> {
+  #[inline(always)]
+  fn from([x, y]: [T; 2]) -> Self { Self { x, y } }
+}
+
 impl<T: Copy> From<T> for Vec2<T> {
+  #[inline(always)]
   fn from(n: T) -> Self { Self { x: n, y: n } }
+}
+
+impl<T> Into<(T, T)> for Vec2<T> {
+  #[inline(always)]
+  fn into(self) -> (T, T) { (self.x, self.y) }
+}
+
+impl<T> Into<[T; 2]> for Vec2<T> {
+  #[inline(always)]
+  fn into(self) -> [T; 2] { [self.x, self.y] }
 }
 
 macro_rules! impl_operator {
   (unary: $($op_name:ident $op_fn_name:ident),+ $(,)?) => { $(
-      use std::ops::$op_name;
-      impl<T: $op_name<Output = T>> $op_name for Vec2<T> {
+    use std::ops::$op_name;
+    impl<T: $op_name<Output = T>> $op_name for Vec2<T> {
       type Output = Self;
+      #[inline(always)]
       fn $op_fn_name(self) -> Self::Output {
         Self { x: $op_name::$op_fn_name(self.x), y: $op_name::$op_fn_name(self.y) }
       }
@@ -138,12 +172,14 @@ macro_rules! impl_operator {
     use std::ops::$op_name;
     impl<T: $op_name<Output = T>> $op_name for Vec2<T> {
       type Output = Self;
+      #[inline(always)]
       fn $op_fn_name(self, rhs: Self) -> Self::Output {
         Self { x: $op_name::$op_fn_name(self.x, rhs.x), y: $op_name::$op_fn_name(self.y, rhs.y) }
       }
     }
     impl<T: $op_name<Output = T> + Copy> $op_name<T> for Vec2<T> {
       type Output = Self;
+      #[inline(always)]
       fn $op_fn_name(self, rhs: T) -> Self::Output {
         Self { x: $op_name::$op_fn_name(self.x, rhs), y: $op_name::$op_fn_name(self.y, rhs) }
       }
@@ -153,12 +189,14 @@ macro_rules! impl_operator {
   (binary_assign: $($op_name:ident $op_fn_name:ident),+ $(,)?) => { $(
     use std::ops::$op_name;
     impl<T: $op_name> $op_name for Vec2<T> {
+      #[inline(always)]
       fn $op_fn_name(&mut self, rhs: Self) {
         $op_name::$op_fn_name(&mut self.x, rhs.x);
         $op_name::$op_fn_name(&mut self.y, rhs.y);
       }
     }
     impl<T: $op_name + Copy> $op_name<T> for Vec2<T> {
+      #[inline(always)]
       fn $op_fn_name(&mut self, rhs: T) {
         $op_name::$op_fn_name(&mut self.x, rhs);
         $op_name::$op_fn_name(&mut self.y, rhs);
@@ -175,6 +213,7 @@ impl_operator!(binary_assign:
 use super::ops::Lerp;
 impl<T: Lerp<Output = T> + Copy> Lerp<Vec2<T>, T> for Vec2<T> {
   type Output = Self;
+  #[inline(always)]
   fn lerp(self, rhs: Self, t: T) -> Self::Output {
     Self { x: self.x.lerp(rhs.x, t), y: self.y.lerp(rhs.y, t) }
   }

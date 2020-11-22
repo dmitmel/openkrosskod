@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use prelude_plus::*;
 use std::ops::{Add, Div, Mul, Sub};
 
 pub trait Lerp<Rhs = Self, Param = Self> {
@@ -10,6 +10,7 @@ macro_rules! impl_lerp_for_floats {
   ($($ty:ident),+ $(,)?) => { $(
     impl Lerp for $ty {
       type Output = Self;
+      #[inline(always)]
       fn lerp(self, rhs: Self, t: Self) -> Self::Output { (rhs - self) * t + self }
     }
   )+ };
@@ -17,21 +18,46 @@ macro_rules! impl_lerp_for_floats {
 
 impl_lerp_for_floats!(f32, f64);
 
-pub trait Clamp<Range = Self> {
+pub trait Clamp2<Range = Self> {
   type Output;
-  fn clamp(self, min: Range, max: Range) -> Self::Output;
+  fn clamp2(self, min: Range, max: Range) -> Self::Output;
+  fn clamp2_abs(self, max: Range) -> Self::Output;
 }
 
-macro_rules! impl_clamp_for_floats {
+macro_rules! impl_clamp2_for_floats {
   ($($ty:ident),+ $(,)?) => { $(
-    impl Clamp for $ty {
+    impl Clamp2 for $ty {
       type Output = Self;
-      fn clamp(self, min: Self, max: Self) -> Self::Output { max.min(min.max(self)) }
+      #[inline(always)]
+      fn clamp2(self, min: Self, max: Self) -> Self::Output { max.min(min.max(self)) }
+      fn clamp2_abs(self, max: Self) -> Self::Output { self.clamp2(-max, max) }
+    }
+
+    impl Clamp2 for super::Vec2<$ty> {
+      type Output = Self;
+      #[inline(always)]
+      fn clamp2(self, min: Self, max: Self) -> Self::Output {
+        Self { x: self.x.clamp2(min.x, max.x), y: self.y.clamp2(min.y, max.y) }
+      }
+      fn clamp2_abs(self, max: Self) -> Self::Output {
+        Self { x: self.x.clamp2_abs(max.x), y: self.y.clamp2_abs(max.y) }
+      }
+    }
+
+    impl Clamp2<$ty> for super::Vec2<$ty> {
+      type Output = Self;
+      #[inline(always)]
+      fn clamp2(self, min: $ty, max: $ty) -> Self::Output {
+        Self { x: self.x.clamp2(min, max), y: self.y.clamp2(min, max) }
+      }
+      fn clamp2_abs(self, max: $ty) -> Self::Output {
+        Self { x: self.x.clamp2_abs(max), y: self.y.clamp2_abs(max) }
+      }
     }
   )+ };
 }
 
-impl_clamp_for_floats!(f32, f64);
+impl_clamp2_for_floats!(f32, f64);
 
 pub trait RangeMap<Range = Self> {
   type Output;
@@ -43,6 +69,7 @@ where
   T: Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Div<Output = T> + Copy,
 {
   type Output = Self;
+  #[inline(always)]
   fn range_map(
     self,
     (from_start, from_end): (Self, Self),

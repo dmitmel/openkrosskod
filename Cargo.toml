@@ -9,14 +9,20 @@ license = "MIT"
 repository = "https://github.com/dmitmel/openkrosskod.git"
 homepage = "https://github.com/dmitmel/openkrosskod"
 
+[workspace]
+
 [dependencies]
+gl = { path = "crates/gl" }
+prelude-plus = { path = "crates/prelude-plus" }
+
 sdl2 = "0.34.3"
 png = "0.16.7"
-rand = "0.7.3"
-cfg-if = "0.1.10"
 
-[build-dependencies]
-gl_generator = "0.14.0"
+serde = "1.0.116"
+serde_json = "1.0.58"
+oorandom = "11.1.2"
+getrandom = "0.2.0"
+num_cpus = "1.13.0"
 
 [features]
-gl_unbind_bindings_on_drop = []
+gl_debug_all_commands = ["gl/gl_debug_all_commands"]

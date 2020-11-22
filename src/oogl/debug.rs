@@ -1,18 +1,16 @@
-use crate::gl_prelude::*;
-use crate::prelude::*;
+use ::gl::prelude::*;
+use prelude_plus::*;
 
-gl_enum! {
-  #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+gl_enum!({
   pub enum DebugMessageSeverity {
     High = DEBUG_SEVERITY_HIGH,
     Medium = DEBUG_SEVERITY_MEDIUM,
     Low = DEBUG_SEVERITY_LOW,
     Notification = DEBUG_SEVERITY_NOTIFICATION,
   }
-}
+});
 
-gl_enum! {
-  #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+gl_enum!({
   pub enum DebugMessageSource {
     API = DEBUG_SOURCE_API,
     WindowSystem = DEBUG_SOURCE_WINDOW_SYSTEM,
@@ -21,10 +19,9 @@ gl_enum! {
     Application = DEBUG_SOURCE_APPLICATION,
     Other = DEBUG_SOURCE_OTHER,
   }
-}
+});
 
-gl_enum! {
-  #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+gl_enum!({
   pub enum DebugMessageType {
     Error = DEBUG_TYPE_ERROR,
     DeprecatedBehavior = DEBUG_TYPE_DEPRECATED_BEHAVIOR,
@@ -36,7 +33,7 @@ gl_enum! {
     PopGroup = DEBUG_TYPE_POP_GROUP,
     Other = DEBUG_TYPE_OTHER,
   }
-}
+});
 
 pub extern "system" fn internal_debug_message_callback(
   source: GLenum,
@@ -61,7 +58,7 @@ pub extern "system" fn internal_debug_message_callback(
   let message_str = String::from_utf8_lossy(message_slice);
 
   eprintln!(
-    "GL debug [source = {}, type = {}, id = 0x{:x}, severity = {}]: message = {}",
-    source_str, type_str, id, severity_str, message_str,
+    "GL debug({}) [source = {}, type = {}, severity = {}]: message = {}",
+    id, source_str, type_str, severity_str, message_str,
   );
 }
