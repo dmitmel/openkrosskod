@@ -39,9 +39,10 @@ macro_rules! impl_rand_size {
       /// See [`Rand32::new`] and [`Rand64::new`].
       #[inline(always)]
       pub fn new(seed: RandSizeSeed) -> Self { Self(RandSizeImpl::new(seed)) }
-      // TODO: https://todo.sr.ht/~icefox/oorandom/5
-      // /// See [`Rand32::new_inc`] and [`Rand64::new_inc`].
-      // pub fn new_inc(seed: RandSizeSeed, increment: RandSizeSeed) { RandSizeImpl::new_inc(seed, increment) }
+      /// See [`Rand32::new_inc`] and [`Rand64::new_inc`].
+      pub fn new_inc(seed: RandSizeSeed, increment: RandSizeSeed) -> Self {
+        Self(RandSizeImpl::new_inc(seed, increment))
+      }
       /// See [`Rand32::state`] and [`Rand64::state`].
       #[inline(always)]
       pub fn state(&self) -> (RandSizeSeed, RandSizeSeed) { self.0.state() }
