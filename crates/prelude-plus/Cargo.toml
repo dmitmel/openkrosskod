@@ -3,3 +3,7 @@ name = "prelude-plus"
 version = "0.1.0"
 publish = false
 edition = "2018"
+
+[dependencies]
+anyhow = "1.0.34"
+log = "0.4.11"

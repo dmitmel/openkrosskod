@@ -1,26 +1,35 @@
 #![forbid(missing_debug_implementations)]
 #![allow(clippy::new_without_default, clippy::missing_safety_doc)]
-#![feature(negative_impls, const_fn, test)]
+#![feature(test, get_mut_unchecked)]
 
+pub mod game_fs;
 pub mod gen_idx;
+pub mod globals;
 pub mod image_decoding_speedrun;
-pub mod math;
-pub mod oogl;
+pub mod input;
 pub mod utils;
 
+use prelude_plus::*;
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Scancode;
 use sdl2::video::{GLProfile, Window};
 use sdl2::EventPump;
 
-use math::ops::Clamp2;
-use math::*;
-use oorandom::Rand64;
-use prelude_plus::*;
+use cardboard_math::*;
+use cardboard_oogl as oogl;
+
+use game_fs::GameFs;
+use globals::{Globals, SharedGlobals};
+
+const GAME_NAME: &str = "openKrossKod";
+// const GAME_NAME: &str = env!("CARGO_PKG_NAME");
+const GAME_VERSION: &str = env!("CARGO_PKG_VERSION");
+const GAME_ENGINE_NAME: &str = "Cardboard Engine, \"The Third Impact\" revision";
 
 const GL_CONTEXT_PROFILE: GLProfile = GLProfile::GLES;
 const GL_CONTEXT_VERSION: (u8, u8) = (2, 0);
 
+const DEFAULT_WINDOW_SIZE: Vec2<u32> = vec2(568 * 2, 320 * 2);
 const BACKGROUND_COLOR: Colorf = colorn(0.1, 1.0);
 
 const RACKET_SIZE: Vec2f = vec2(20.0, 200.0);
@@ -33,14 +42,31 @@ const RACKET_SLOWDOWN: f32 = 12.0;
 const RACKET_SPEED_EPSILON: f32 = 1.0;
 
 const BALL_SIZE: Vec2f = vec2n(80.0);
-const BALL_ROTATION_SPEED: f32 = f32::consts::TAU;
+const BALL_ROTATION_SPEED: f32 = 1.0;
 const BALL_MAX_SPEED: f32 = 1000.0;
 
-fn main() {
+fn main() -> AnyResult<()> {
+  env_logger::init_from_env(env_logger::Env::default().default_filter_or("debug"));
   // return image_decoding_speedrun::main();
 
-  let sdl_context = sdl2::init().unwrap();
-  let video_subsystem = sdl_context.video().unwrap();
+  info!("{} v{} ({})", GAME_NAME, GAME_VERSION, GAME_ENGINE_NAME);
+
+  let game_fs = GameFs::init().context("Failed to initialize GameFs")?;
+  info!("Installation directory: '{}'", game_fs.installation_dir.display());
+
+  let random = globals::GlobalRandom::init()
+    .context("Failed to initialize a random number generator (RNG)")?;
+
+  let sdl_context =
+    sdl2::init().map_err(AnyError::msg).context("Failed to create an SDL context")?;
+  let video_subsystem = sdl_context
+    .video()
+    .map_err(AnyError::msg)
+    .context("Failed to initialize SDL's video subsystem")?;
+  let event_pump = sdl_context
+    .event_pump()
+    .map_err(AnyError::msg)
+    .context("Failed to obtain an SDL event pump")?;
 
   // NOTE: It is very important that GL context attributes are set **before**
   // creating the window! For some reason not doing the initialization in this
@@ -52,49 +78,66 @@ fn main() {
   // gl_attr.set_multisample_buffers(1);
   // gl_attr.set_multisample_samples(4);
 
-  let window_title = concat!(env!("CARGO_PKG_NAME"), " v", env!("CARGO_PKG_VERSION"));
-  let window =
-    video_subsystem.window(window_title, 800, 600).resizable().opengl().build().unwrap();
+  let window = video_subsystem
+    .window(
+      &format!("{} v{}", GAME_NAME, GAME_VERSION),
+      DEFAULT_WINDOW_SIZE.x,
+      DEFAULT_WINDOW_SIZE.y,
+    )
+    .resizable()
+    .opengl()
+    .build()
+    .context("Failed to create the game window")?;
 
-  let gl_ctx = window.gl_create_context().unwrap();
-  assert_eq!(gl_attr.context_profile(), GL_CONTEXT_PROFILE);
-  assert_eq!(gl_attr.context_version(), GL_CONTEXT_VERSION);
+  let gl_ctx = window
+    .gl_create_context()
+    .map_err(AnyError::msg)
+    .context("Failed to create an OpenGL context for the game window")?;
+  assert_eq!(
+    (gl_attr.context_profile(), gl_attr.context_version()),
+    (GL_CONTEXT_PROFILE, GL_CONTEXT_VERSION)
+  );
 
   let gl = Rc::new(oogl::Context::load_with(&video_subsystem, gl_ctx));
-  println!("{:?}", gl.capabilities());
+  debug!("{:?}", gl.capabilities());
 
   gl.set_blending_factors(oogl::BlendingFactor::SrcAlpha, oogl::BlendingFactor::OneMinusSrcAlpha);
   gl.set_blending_equation(oogl::BlendingEquation::Add);
 
-  let mut ball_texture = oogl::Texture2D::new(Rc::clone(&gl));
+  let globals = Rc::new({
+    let window_size_i = Vec2::from(window.size());
+    Globals {
+      gl,
+      game_fs,
+      random,
+
+      time: 0.0,
+      delta_time: 0.0,
+      fixed_delta_time: 1.0 / 60.0,
+
+      window_size_i,
+      window_size: window_size_i.cast_into(),
+      window_was_resized: true,
+
+      input_state: input::InputState::new(),
+    }
+  });
+
+  let mut ball_texture = oogl::Texture2D::new(Rc::clone(&globals.gl));
   {
     let bound_texture = ball_texture.bind(None);
     bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
     bound_texture.set_filters(oogl::TextureFilter::Linear, None);
-    load_texture_data_from_png(0, &bound_texture, File::open("trololo.png").unwrap());
+    load_texture_data_from_png(0, &bound_texture, globals.game_fs.open_file("trololo.png")?)
+      .context("Failed to decode 'trololo.png'")?;
   }
 
-  let event_pump = sdl_context.event_pump().unwrap();
+  let renderer =
+    Renderer::init(Rc::clone(&globals)).context("Failed to initialize the renderer")?;
 
-  let rng = Rand64::new({
-    let mut seed_bytes = [0u8; mem::size_of::<u128>()];
-    getrandom::getrandom(&mut seed_bytes).unwrap();
-    u128::from_le_bytes(seed_bytes)
-  });
-
-  let window_size = {
-    let (w, h) = window.size();
-    vec2(w as f32, h as f32)
-  };
   let mut game = Game {
-    running: true,
-    globals: Globals {
-      time: 0.0,
-      delta_time: 0.0,
-      fixed_delta_time: 1.0 / 60.0,
-      window_size,
-      input_state: InputState { mouse_pos: vec2n(0.0), keys_state: InputStateKeyTable::new() },
-    },
+    should_stop: false,
+    globals,
     state: GameState {
       left_racket: Racket { pos: 0.0, vel: 0.0, accel: 0.0 },
       right_racket: Racket { pos: 0.0, vel: 0.0, accel: 0.0 },
@@ -106,69 +149,16 @@ fn main() {
       },
     },
 
+    sdl_context,
+    video_subsystem,
     window,
     event_pump,
-    rng,
-    gl: Rc::clone(&gl),
-    renderer: Renderer::init(&gl),
+    renderer,
     ball_texture,
   };
 
-  game.start_loop();
+  game.start_loop()
 }
-
-#[derive(Debug)]
-pub struct Globals {
-  pub time: f64,
-  pub delta_time: f64,
-  pub fixed_delta_time: f64,
-  pub window_size: Vec2f,
-  pub input_state: InputState,
-}
-
-#[derive(Debug)]
-pub struct InputState {
-  pub mouse_pos: Vec2f,
-  pub keys_state: InputStateKeyTable,
-}
-
-impl InputState {
-  pub fn is_key_pressed(&self, scancode: Scancode) -> bool {
-    match self.keys_state.get(scancode) {
-      Some(pressed) => *pressed,
-      None => false,
-    }
-  }
-}
-
-macro_rules! generate_input_state_key_table {
-  ($($scancode:ident),+ $(,)?) => {
-    #[allow(non_snake_case)]
-    #[derive(Debug)]
-    pub struct InputStateKeyTable {
-      $(pub $scancode: bool),+
-    }
-
-    impl InputStateKeyTable {
-      pub fn new() -> Self { Self { $($scancode: false),+ } }
-
-      pub fn get(&self, scancode: Scancode) -> Option<&'_ bool> {
-        Some(match scancode {
-          $(Scancode::$scancode => &self.$scancode,)+
-          _ => return None,
-        })
-      }
-
-      pub fn get_mut(&mut self, scancode: Scancode) -> Option<&'_ mut bool> {
-        Some(match scancode {
-          $(Scancode::$scancode => &mut self.$scancode,)+
-          _ => return None,
-        })
-      }
-    }
-  };
-}
-generate_input_state_key_table![W, S, Up, Down];
 
 #[derive(Debug)]
 struct GameState {
@@ -193,39 +183,41 @@ struct Ball {
 }
 
 struct Game {
-  pub running: bool,
-  pub globals: Globals,
+  pub should_stop: bool,
+  pub globals: SharedGlobals,
   pub state: GameState,
 
+  pub sdl_context: sdl2::Sdl,
+  pub video_subsystem: sdl2::VideoSubsystem,
   pub window: Window,
   pub event_pump: EventPump,
-  pub rng: Rand64,
-  pub gl: oogl::SharedContext,
   pub renderer: Renderer,
   pub ball_texture: oogl::Texture2D,
 }
 
 impl Game {
-  pub fn start_loop(&mut self) {
+  pub fn start_loop(&mut self) -> AnyResult<()> {
     let mut prev_time = Instant::now();
     let mut fixed_update_time_accumulator = 0.0;
 
-    self.gl.clear_color(BACKGROUND_COLOR);
+    self.globals.gl.clear_color(BACKGROUND_COLOR);
     self.window.gl_swap_window();
 
-    while self.running {
+    while !self.should_stop {
       let current_time = Instant::now();
       let delta_time = (current_time - prev_time).as_secs_f64();
-      self.globals.delta_time = delta_time;
+      unsafe { Rc::get_mut_unchecked(&mut self.globals) }.delta_time = delta_time;
 
       self.process_input();
 
       fixed_update_time_accumulator += delta_time;
       let fixed_delta_time = self.globals.fixed_delta_time;
+      // FIXME: What if a lot of time has passed between frames, e.g. due to the
+      // game being suspended or paused with SIGSTOP (and resumed with SIGCONT)?
       while fixed_update_time_accumulator >= fixed_delta_time {
         self.fixed_update();
         fixed_update_time_accumulator -= fixed_delta_time;
-        self.globals.time += fixed_delta_time;
+        unsafe { Rc::get_mut_unchecked(&mut self.globals) }.time += fixed_delta_time;
       }
 
       self.update();
@@ -234,46 +226,59 @@ impl Game {
         println!("================ [OpenGL] ================");
       }
 
-      self.gl.clear_color(BACKGROUND_COLOR);
+      self.globals.gl.clear_color(BACKGROUND_COLOR);
       self.render();
       self.window.gl_swap_window();
 
       prev_time = current_time;
     }
+
+    Ok(())
   }
 
   pub fn process_input(&mut self) {
+    let globals = unsafe { Rc::get_mut_unchecked(&mut self.globals) };
+    let main_window_id = self.window.id();
+
+    globals.window_was_resized = false;
+
     for event in self.event_pump.poll_iter() {
       match event {
-        Event::Quit { .. } | Event::KeyDown { scancode: Some(Scancode::Escape), .. } => {
-          self.running = false;
-          return;
+        Event::Quit { .. } | Event::AppTerminating { .. } | Event::AppLowMemory { .. } => {
+          self.should_stop = true;
         }
 
-        Event::Window { win_event: WindowEvent::SizeChanged(w, h), .. } => {
+        Event::Window { window_id, win_event: WindowEvent::Close, .. }
+          if window_id == main_window_id =>
+        {
+          self.should_stop = true;
+        }
+
+        Event::Window { window_id, win_event: WindowEvent::SizeChanged(w, h), .. }
+          if window_id == main_window_id =>
+        {
           assert!(w > 0);
           assert!(h > 0);
-          self.globals.window_size = vec2(w as f32, h as f32);
-          self.gl.set_viewport(0, 0, w, h);
+          globals.window_size_i = vec2(w as u32, h as u32);
+          globals.window_size = vec2(w as f32, h as f32);
+          globals.window_was_resized = true;
         }
 
-        Event::MouseMotion { x, y, .. } => {
-          self.globals.input_state.mouse_pos = vec2(
-            x as f32 - self.globals.window_size.x * 0.5,
-            self.globals.window_size.y * 0.5 - y as f32,
-          );
+        Event::MouseMotion { window_id, x, y, .. } if window_id == main_window_id => {
+          globals.input_state.mouse_pos =
+            vec2(x as f32 - globals.window_size.x * 0.5, globals.window_size.y * 0.5 - y as f32);
         }
 
-        Event::KeyDown { repeat: false, scancode: Some(scancode), .. } => {
-          if let Some(state) = self.globals.input_state.keys_state.get_mut(scancode) {
-            *state = true;
-          }
+        Event::KeyDown { window_id, repeat: false, scancode: Some(scancode), .. }
+          if window_id == main_window_id =>
+        {
+          globals.input_state.keyboard.set(scancode, true);
         }
 
-        Event::KeyUp { repeat: false, scancode: Some(scancode), .. } => {
-          if let Some(state) = self.globals.input_state.keys_state.get_mut(scancode) {
-            *state = false;
-          }
+        Event::KeyUp { window_id, repeat: false, scancode: Some(scancode), .. }
+          if window_id == main_window_id =>
+        {
+          globals.input_state.keyboard.set(scancode, false);
         }
 
         _ => {}
@@ -281,20 +286,25 @@ impl Game {
     }
   }
 
-  pub fn update(&mut self) {}
+  pub fn update(&mut self) {
+    if self.globals.input_state.is_key_down(Scancode::Q) {
+      self.should_stop = true;
+    }
+  }
 
   pub fn fixed_update(&mut self) {
     let fixed_delta_time = self.globals.fixed_delta_time as f32;
+    let window_size = self.globals.window_size;
 
     for (racket, key_up, key_down) in &mut [
       (&mut self.state.left_racket, Scancode::W, Scancode::S),
       (&mut self.state.right_racket, Scancode::Up, Scancode::Down),
     ] {
       let mut dir = 0.0;
-      if self.globals.input_state.is_key_pressed(*key_up) {
+      if self.globals.input_state.is_key_down(*key_up) {
         dir += 1.0;
       }
-      if self.globals.input_state.is_key_pressed(*key_down) {
+      if self.globals.input_state.is_key_down(*key_down) {
         dir -= 1.0;
       }
       racket.accel = dir * RACKET_MAX_SPEED * RACKET_ACCELERATION;
@@ -307,9 +317,8 @@ impl Game {
       }
 
       racket.pos += racket.vel * fixed_delta_time;
+      racket.pos = racket.pos.clamp2_abs((window_size.y / 2.0 - RACKET_SIZE.y / 2.0).abs());
     }
-
-    let window_size = self.globals.window_size;
 
     {
       let ball = &mut self.state.ball;
@@ -323,15 +332,18 @@ impl Game {
         ball.vel.y = -ball.vel.y;
       }
 
-      ball.pos = ball.pos.clamp2_abs(bouncing_bounds);
+      ball.pos = ball.pos.clamp2_abs(bouncing_bounds.abs());
 
-      ball.rotation += ball.rotation_speed * fixed_delta_time;
+      ball.rotation += ball.rotation_speed * f32::consts::TAU * fixed_delta_time;
     }
   }
 
   pub fn render(&mut self) {
+    self.globals.gl.set_viewport(vec2n(0), self.globals.window_size_i.cast_into());
+
+    self.renderer.prepare();
+
     let window_size = self.globals.window_size;
-    self.renderer.set_window_size(window_size);
     for (side, racket) in &[(-1.0, &self.state.left_racket), (1.0, &self.state.right_racket)] {
       self.renderer.draw_shape(Shape {
         type_: ShapeType::Rectangle,
@@ -356,6 +368,8 @@ impl Game {
 }
 
 struct Renderer {
+  globals: SharedGlobals,
+
   vbo: oogl::VertexBuffer<[i8; 2]>,
   white_texture: oogl::Texture2D,
 
@@ -377,27 +391,33 @@ struct Renderer {
 }
 
 impl Renderer {
-  fn init(gl: &oogl::SharedContext) -> Self {
+  fn init(globals: SharedGlobals) -> AnyResult<Self> {
+    let gl = &globals.gl;
+
     let common_vertex_shader = compile_shader(
       Rc::clone(&gl),
-      include_bytes!("shaders/shape.vert.glsl"),
+      &globals.game_fs.read_binary_file("shaders/shape.vert.glsl")?,
       oogl::ShaderType::Vertex,
-    );
+    )
+    .context("Failed to link the 'shaders/shape.vert.glsl'")?;
 
     let rectangle_fragment_shader = compile_shader(
       Rc::clone(&gl),
-      include_bytes!("shaders/rectangle.frag.glsl"),
+      &globals.game_fs.read_binary_file("shaders/rectangle.frag.glsl")?,
       oogl::ShaderType::Fragment,
-    );
+    )
+    .context("Failed to link the 'shaders/rectangle.frag.glsl'")?;
 
     let ellipse_fragment_shader = compile_shader(
       Rc::clone(&gl),
-      include_bytes!("shaders/ellipse.frag.glsl"),
+      &globals.game_fs.read_binary_file("shaders/ellipse.frag.glsl")?,
       oogl::ShaderType::Fragment,
-    );
+    )
+    .context("Failed to link the 'shaders/ellipse.frag.glsl'")?;
 
     let rectangle_program =
-      link_program(Rc::clone(&gl), &[&common_vertex_shader, &rectangle_fragment_shader]);
+      link_program(Rc::clone(&gl), &[&common_vertex_shader, &rectangle_fragment_shader])
+        .context("Failed to link the rectangle program")?;
     let rectangle_attribute_pos = rectangle_program.get_attribute(b"a_pos");
     let rectangle_uniform_window_size = rectangle_program.get_uniform(b"u_window_size");
     let rectangle_uniform_pos = rectangle_program.get_uniform(b"u_pos");
@@ -407,7 +427,8 @@ impl Renderer {
     let rectangle_uniform_tex = rectangle_program.get_uniform(b"u_tex");
 
     let ellipse_program =
-      link_program(Rc::clone(&gl), &[&common_vertex_shader, &ellipse_fragment_shader]);
+      link_program(Rc::clone(&gl), &[&common_vertex_shader, &ellipse_fragment_shader])
+        .context("Failed to link the ellipse program")?;
     let ellipse_attribute_pos = ellipse_program.get_attribute(b"a_pos");
     let ellipse_uniform_window_size = ellipse_program.get_uniform(b"u_window_size");
     let ellipse_uniform_pos = ellipse_program.get_uniform(b"u_pos");
@@ -420,7 +441,7 @@ impl Renderer {
     assert_eq!(rectangle_attribute_pos.data_type(), ellipse_attribute_pos.data_type());
 
     let mut vbo = oogl::VertexBuffer::new(
-      Rc::clone(gl),
+      Rc::clone(&gl),
       // this attribute pointer will be the same for both programs because both
       // use the same vertex shader, as such the VBO can be shared
       vec![rectangle_attribute_pos.to_pointer(oogl::AttributePtrConfig {
@@ -441,17 +462,19 @@ impl Renderer {
     {
       let bound_texture = white_texture.bind(None);
       bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
-      bound_texture.set_filters(oogl::TextureFilter::Nearest, None);
+      bound_texture.set_filters(oogl::TextureFilter::Linear, None);
       bound_texture.set_data(
         0,
         oogl::TextureInputFormat::Luminance,
         oogl::TextureInternalFormat::Luminance,
-        (1, 1),
+        vec2n(1),
         &[255],
       )
     }
 
-    Self {
+    Ok(Self {
+      globals,
+
       vbo,
       white_texture,
 
@@ -470,10 +493,12 @@ impl Renderer {
       ellipse_uniform_rotation,
       ellipse_uniform_color,
       ellipse_uniform_tex,
-    }
+    })
   }
 
-  fn set_window_size(&mut self, window_size: Vec2f) {
+  fn prepare(&mut self) {
+    let window_size = self.globals.window_size;
+
     {
       let program = self.rectangle_program.bind();
       self.rectangle_uniform_window_size.set(&program, window_size);
@@ -547,7 +572,11 @@ enum ShapeFill<'a> {
 //   link_program(gl, &[&vs, &fs])
 // }
 
-fn compile_shader(ctx: oogl::SharedContext, src: &[u8], type_: oogl::ShaderType) -> oogl::Shader {
+fn compile_shader(
+  ctx: oogl::SharedContext,
+  src: &[u8],
+  type_: oogl::ShaderType,
+) -> AnyResult<oogl::Shader> {
   let shader = oogl::Shader::new(ctx, type_);
   shader.set_source(src);
 
@@ -555,15 +584,15 @@ fn compile_shader(ctx: oogl::SharedContext, src: &[u8], type_: oogl::ShaderType)
   let log = shader.get_info_log();
   let log = String::from_utf8_lossy(&log);
   if !success {
-    panic!("Shader compilation error(s):\n{}", log);
+    bail!("Shader compilation error(s):\n{}", log);
   } else if !log.is_empty() {
-    eprintln!("Shader compilation warning(s):\n{}", log);
+    warn!("Shader compilation warning(s):\n{}", log);
   }
 
-  shader
+  Ok(shader)
 }
 
-fn link_program(ctx: oogl::SharedContext, shaders: &[&oogl::Shader]) -> oogl::Program {
+fn link_program(ctx: oogl::SharedContext, shaders: &[&oogl::Shader]) -> AnyResult<oogl::Program> {
   let program = oogl::Program::new(ctx);
   for shader in shaders {
     program.attach_shader(shader);
@@ -573,26 +602,26 @@ fn link_program(ctx: oogl::SharedContext, shaders: &[&oogl::Shader]) -> oogl::Pr
   let log = program.get_info_log();
   let log = String::from_utf8_lossy(&log);
   if !success {
-    panic!("Program linking error: {}", log);
+    bail!("Program linking error: {}", log);
   } else if !log.is_empty() {
-    eprintln!("Program linking warning: {}", log);
+    warn!("Program linking warning: {}", log);
   }
 
   for shader in shaders {
     program.detach_shader(shader);
   }
-  program
+  Ok(program)
 }
 
 fn load_texture_data_from_png<R: Read>(
   level_of_detail: u32,
   bound_texture: &oogl::Texture2DBinding<'_>,
   reader: R,
-) -> (u32, u32) {
+) -> Result<Vec2<u32>, png::DecodingError> {
   let decoder = png::Decoder::new(reader);
-  let (info, mut reader) = decoder.read_info().unwrap();
+  let (info, mut reader) = decoder.read_info()?;
   let mut buf = vec![0; info.buffer_size()];
-  reader.next_frame(&mut buf).unwrap();
+  reader.next_frame(&mut buf)?;
 
   use oogl::{TextureInputFormat, TextureInternalFormat};
   use png::{BitDepth, ColorType};
@@ -616,9 +645,9 @@ fn load_texture_data_from_png<R: Read>(
     level_of_detail,
     gl_format,
     gl_internal_format,
-    (info.width, info.height),
+    vec2(info.width, info.height),
     &buf,
   );
 
-  (info.width, info.height)
+  Ok(vec2(info.width, info.height))
 }

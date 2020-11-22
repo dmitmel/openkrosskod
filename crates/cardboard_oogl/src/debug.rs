@@ -57,8 +57,8 @@ pub extern "system" fn internal_debug_message_callback(
   let message_slice = unsafe { slice::from_raw_parts(message as *const u8, length as usize) };
   let message_str = String::from_utf8_lossy(message_slice);
 
-  eprintln!(
-    "GL debug({}) [source = {}, type = {}, severity = {}]: message = {}",
+  debug!(
+    "0x{:08x} [source = {}, type = {}, severity = {}]: message = {}",
     id, source_str, type_str, severity_str, message_str,
   );
 }

@@ -1,6 +1,6 @@
-use super::debug;
-use crate::math::*;
+use crate::debug;
 use ::gl::prelude::*;
+use cardboard_math::*;
 use prelude_plus::*;
 
 pub type RawGL = Gles2;
@@ -12,12 +12,12 @@ pub struct Context {
   sdl_gl_context: sdl2::video::GLContext,
   capabilities: ContextCapabilities,
 
-  pub(super) bound_program: BindingTarget<ProgramBindingTarget>,
-  pub(super) bound_vertex_buffer: BindingTarget<BufferBindingTarget>,
-  pub(super) bound_element_buffer: BindingTarget<BufferBindingTarget>,
-  pub(super) active_texture_unit: Cell<u32>,
-  pub(super) bound_texture_2d: BindingTarget<TextureBindingTarget>,
-  pub(super) bound_framebuffer: BindingTarget<FramebufferBindingTarget>,
+  pub(crate) bound_program: BindingTarget<ProgramBindingTarget>,
+  pub(crate) bound_vertex_buffer: BindingTarget<BufferBindingTarget>,
+  pub(crate) bound_element_buffer: BindingTarget<BufferBindingTarget>,
+  pub(crate) active_texture_unit: Cell<u32>,
+  pub(crate) bound_texture_2d: BindingTarget<TextureBindingTarget>,
+  pub(crate) bound_framebuffer: BindingTarget<FramebufferBindingTarget>,
 }
 
 impl !Send for Context {}
@@ -42,9 +42,9 @@ impl Context {
       }
     }
 
-    unsafe { gl.Enable(gl::BLEND) };
-
     let capabilities = ContextCapabilities::load(&gl);
+
+    unsafe { gl.Enable(gl::BLEND) };
 
     Self {
       raw_gl: gl,
@@ -54,11 +54,11 @@ impl Context {
       // programs are a special case, the binding target value doesn't matter
       // because there is no such thing as binding a program to a target
       bound_program: BindingTarget::new(gl::NONE),
-      bound_vertex_buffer: BindingTarget::new(super::BindBufferTarget::Vertex.as_raw()),
-      bound_element_buffer: BindingTarget::new(super::BindBufferTarget::Element.as_raw()),
+      bound_vertex_buffer: BindingTarget::new(crate::BindBufferTarget::Vertex.as_raw()),
+      bound_element_buffer: BindingTarget::new(crate::BindBufferTarget::Element.as_raw()),
       active_texture_unit: Cell::new(0),
-      bound_texture_2d: BindingTarget::new(super::BindTextureTarget::Texture2D.as_raw()),
-      bound_framebuffer: BindingTarget::new(super::BindFramebufferTarget::Default.as_raw()),
+      bound_texture_2d: BindingTarget::new(crate::BindTextureTarget::Texture2D.as_raw()),
+      bound_framebuffer: BindingTarget::new(crate::BindFramebufferTarget::Default.as_raw()),
     }
   }
 
@@ -69,8 +69,8 @@ impl Context {
     }
   }
 
-  pub fn set_viewport(&self, x: i32, y: i32, w: i32, h: i32) {
-    unsafe { self.raw_gl.Viewport(x, y, w, h) };
+  pub fn set_viewport(&self, pos: Vec2<i32>, size: Vec2<i32>) {
+    unsafe { self.raw_gl.Viewport(pos.x, pos.y, size.x, size.y) };
   }
 
   pub fn set_blending_factors(&self, src: BlendingFactor, dest: BlendingFactor) {
@@ -89,44 +89,44 @@ impl Context {
 // TODO: Perhaps implement this properly later?
 impl fmt::Debug for Context {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "Context#<{:p}>", &self.sdl_gl_context)
+    write!(f, "Context#<{:p}>", unsafe { self.sdl_gl_context.raw() })
   }
 }
 
 #[derive(Debug)]
-pub(super) struct BindingTarget<T> {
+pub(crate) struct BindingTarget<T> {
   target: GLenum,
   bound_addr: Cell<u32>,
   phantom: PhantomData<*mut T>,
 }
 impl<T> BindingTarget<T> {
-  pub(super) fn bound_addr(&self) -> u32 { self.bound_addr.get() }
+  pub(crate) fn bound_addr(&self) -> u32 { self.bound_addr.get() }
   #[allow(dead_code)]
-  pub(super) fn is_anything_bound(&self) -> bool { self.bound_addr.get() != 0 }
-  pub(super) fn new(target: GLenum) -> Self {
+  pub(crate) fn is_anything_bound(&self) -> bool { self.bound_addr.get() != 0 }
+  pub(crate) fn new(target: GLenum) -> Self {
     Self { target, bound_addr: Cell::new(0), phantom: PhantomData }
   }
 }
 
 macro_rules! impl_binding_target_state {
   ($target_enum:ident, $gl_bind_fn:ident ($($target:ident)?)) => {
-    pub(super) enum $target_enum {}
+    pub(crate) enum $target_enum {}
 
     #[allow(dead_code)]
     impl BindingTarget<$target_enum> {
       #[inline(always)]
-      pub(super) fn bind_unconditionally(&self, gl: &RawGL, addr: u32) {
+      pub(crate) fn bind_unconditionally(&self, gl: &RawGL, addr: u32) {
         unsafe { gl.$gl_bind_fn($(self.$target, )? addr) };
         self.bound_addr.set(addr);
       }
 
       #[inline(always)]
-      pub(super) fn unbind_unconditionally(&self, gl: &RawGL) {
+      pub(crate) fn unbind_unconditionally(&self, gl: &RawGL) {
         self.bind_unconditionally(gl, 0)
       }
 
       #[inline(always)]
-      pub(super) fn bind_if_needed(&self, gl: &RawGL, addr: u32) {
+      pub(crate) fn bind_if_needed(&self, gl: &RawGL, addr: u32) {
         if self.bound_addr.get() != addr {
           self.bind_unconditionally(gl, addr);
         }
@@ -150,8 +150,16 @@ impl_binding_target_state!(FramebufferBindingTarget, BindFramebuffer(target));
 
 #[derive(Debug)]
 pub struct ContextCapabilities {
+  pub renderer: String,
+  pub vendor: String,
+  pub gl_version: String,
+  pub glsl_version: String,
+  pub extensions: ContextExtensions,
+
   pub max_texture_units: u32,
   pub max_texture_size: u32,
+
+  pub max_debug_object_label_len: u32,
 }
 
 impl ContextCapabilities {
@@ -167,6 +175,27 @@ impl ContextCapabilities {
       unsafe { gl.GetIntegerv(name, &mut value) }
       value
     }
+
+    fn get_uint_1(gl: &RawGL, name: GLenum) -> GLuint { get_int_1(gl, name) as _ }
+
+    fn get_string(gl: &RawGL, name: GLenum) -> String {
+      let ptr: *const GLubyte = unsafe { gl.GetString(name) };
+      assert!(!ptr.is_null());
+      let c_str = unsafe { CStr::from_ptr(ptr as *const c_char) };
+      String::from_utf8(c_str.to_bytes().to_vec()).expect("GetString returned a non-UTF8 string")
+    }
+
+    let renderer = get_string(gl, gl::RENDERER);
+    info!("GL renderer:    {}", renderer);
+    let vendor = get_string(gl, gl::VENDOR);
+    info!("GL vendor:      {}", vendor);
+    let gl_version = get_string(gl, gl::VERSION);
+    info!("GL version:     {}", gl_version);
+    let glsl_version = get_string(gl, gl::SHADING_LANGUAGE_VERSION);
+    info!("GLSL version:   {}", glsl_version);
+
+    let extensions = get_string(gl, gl::EXTENSIONS).split(' ').collect::<ContextExtensions>();
+    info!("GL extensions:  {:?}", extensions);
 
     // TODO:
     // fn get_number_precision(
@@ -199,11 +228,51 @@ impl ContextCapabilities {
     // }
 
     Self {
-      max_texture_units: get_int_1(gl, gl::MAX_COMBINED_TEXTURE_IMAGE_UNITS) as u32,
-      max_texture_size: get_int_1(gl, gl::MAX_TEXTURE_SIZE) as u32,
+      renderer,
+      vendor,
+      gl_version,
+      glsl_version,
+      extensions,
+
+      max_texture_units: get_uint_1(gl, gl::MAX_COMBINED_TEXTURE_IMAGE_UNITS),
+      max_texture_size: get_uint_1(gl, gl::MAX_TEXTURE_SIZE),
+
+      max_debug_object_label_len: if gl.ObjectLabel.is_loaded() {
+        get_uint_1(gl, gl::MAX_LABEL_LENGTH)
+      } else {
+        0
+      },
     }
   }
 }
+
+macro_rules! generate_context_extensions_struct {
+  ($(($name:literal, $field:ident)),* $(,)?) => {
+    #[derive(Debug)]
+    pub struct ContextExtensions {
+      $(pub $field: bool),*
+    }
+
+    impl<'a> FromIterator<&'a str> for ContextExtensions {
+      fn from_iter<T: IntoIterator<Item = &'a str>>(iter: T) -> Self {
+        let mut extensions = ContextExtensions {
+          $($field: false),*
+        };
+
+        for name in iter {
+          match name {
+            $($name => extensions.$field = true,)*
+            _ => {}
+          }
+        }
+
+        extensions
+      }
+    }
+  };
+}
+
+generate_context_extensions_struct![("GL_KHR_debug", gl_khr_debug)];
 
 // gl_enum!({
 //   pub enum NumberPrecisionType {

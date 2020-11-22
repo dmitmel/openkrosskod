@@ -1,0 +1,14 @@
+[package]
+name = "cardboard_oogl"
+version = "0.1.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+sdl2 = "0.34.3"
+gl = { path = "../gl" }
+cardboard_math = { path = "../cardboard_math" }
+prelude-plus = { path = "../prelude-plus" }
+
+[features]
+debug_all_commands = ["gl/debug_all_commands"]

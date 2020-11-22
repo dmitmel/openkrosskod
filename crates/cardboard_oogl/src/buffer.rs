@@ -1,4 +1,4 @@
-use super::{ProgramBinding, RawGL, SharedContext, INACTIVE_ATTRIBUTE_LOCATION};
+use crate::{ProgramBinding, RawGL, SharedContext, INACTIVE_ATTRIBUTE_LOCATION};
 use ::gl::prelude::*;
 use prelude_plus::*;
 

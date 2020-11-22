@@ -1,3 +1,7 @@
+#![feature(negative_impls)]
+
+// TODO: INLINE TRIVIAL STUFF!!!
+
 macro_rules! gl_enum {
   // a wrapper for autoformatting purposes
   ({$($tt:tt)+}) => { gl_enum! { $($tt)+ } };

@@ -1,5 +1,6 @@
-use super::{RawGL, SharedContext};
+use crate::{RawGL, SharedContext};
 use ::gl::prelude::*;
+use cardboard_math::*;
 use prelude_plus::*;
 
 gl_enum!({
@@ -121,16 +122,15 @@ impl<'tex> Texture2DBinding<'tex> {
     level_of_detail: u32,
     format: TextureInputFormat,
     internal_format: TextureInternalFormat,
-    size: (u32, u32),
+    size: Vec2<u32>,
     data: &[u8],
   ) {
     let ctx = self.ctx();
 
-    let (width, height) = size;
     let max_size = ctx.capabilities().max_texture_size;
-    assert!(width <= max_size);
-    assert!(height <= max_size);
-    assert_eq!(data.len(), width as usize * height as usize * format.color_components() as usize);
+    assert!(size.x <= max_size);
+    assert!(size.y <= max_size);
+    assert_eq!(data.len(), size.x as usize * size.y as usize * format.color_components() as usize);
 
     self.set_data_internal(
       level_of_detail,
@@ -146,14 +146,13 @@ impl<'tex> Texture2DBinding<'tex> {
     level_of_detail: u32,
     format: TextureInputFormat,
     internal_format: TextureInternalFormat,
-    size: (u32, u32),
+    size: Vec2<u32>,
   ) {
     let ctx = self.ctx();
 
-    let (width, height) = size;
     let max_size = ctx.capabilities().max_texture_size;
-    assert!(width <= max_size);
-    assert!(height <= max_size);
+    assert!(size.x <= max_size);
+    assert!(size.y <= max_size);
 
     self.set_data_internal(level_of_detail, format, internal_format, size, ptr::null());
   }
@@ -163,7 +162,7 @@ impl<'tex> Texture2DBinding<'tex> {
     level_of_detail: u32,
     format: TextureInputFormat,
     internal_format: TextureInternalFormat,
-    (width, height): (u32, u32),
+    size: Vec2<u32>,
     data_ptr: *const GLvoid,
   ) {
     unsafe {
@@ -171,8 +170,8 @@ impl<'tex> Texture2DBinding<'tex> {
         Self::BIND_TARGET.as_raw(),
         GLint::try_from(level_of_detail).unwrap(),
         internal_format.as_raw() as GLint,
-        GLint::try_from(width).unwrap(),
-        GLint::try_from(height).unwrap(),
+        GLint::try_from(size.x).unwrap(),
+        GLint::try_from(size.y).unwrap(),
         0, // border, must be zero
         format.as_raw(),
         TextureInputDataType::U8.as_raw(),
@@ -185,20 +184,20 @@ impl<'tex> Texture2DBinding<'tex> {
     &self,
     level_of_detail: u32,
     format: TextureInputFormat,
-    (x_offset, y_offset): (u32, u32),
-    (width, height): (u32, u32),
+    offset: Vec2<u32>,
+    size: Vec2<u32>,
     data: &[u8],
   ) {
-    assert_eq!(data.len(), width as usize * height as usize * format.color_components() as usize);
+    assert_eq!(data.len(), size.x as usize * size.y as usize * format.color_components() as usize);
 
     unsafe {
       self.ctx().raw_gl().TexSubImage2D(
         Self::BIND_TARGET.as_raw(),
         GLint::try_from(level_of_detail).unwrap(),
-        GLint::try_from(x_offset).unwrap(),
-        GLint::try_from(y_offset).unwrap(),
-        GLint::try_from(width).unwrap(),
-        GLint::try_from(height).unwrap(),
+        GLint::try_from(offset.x).unwrap(),
+        GLint::try_from(offset.y).unwrap(),
+        GLint::try_from(size.x).unwrap(),
+        GLint::try_from(size.y).unwrap(),
         format.as_raw(),
         TextureInputDataType::U8.as_raw(),
         data.as_ptr() as *const _,

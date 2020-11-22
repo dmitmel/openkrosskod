@@ -7,14 +7,18 @@ pub use std::collections::{
   BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque,
 };
 pub use std::convert::{TryFrom, TryInto};
+pub use std::env;
 pub use std::ffi::{self, CStr, CString, OsStr, OsString};
 pub use std::fmt;
 pub use std::fs::{self, File, OpenOptions as FileOpenOptions};
 pub use std::io::{self, BufRead, BufReader, BufWriter, Read, Seek, Write};
-pub use std::iter;
+pub use std::iter::{self, FromIterator};
 pub use std::marker::PhantomData;
 pub use std::mem;
+pub use std::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
+pub use std::os::raw::*;
 pub use std::path::{Path, PathBuf};
+pub use std::pin::Pin;
 pub use std::ptr;
 pub use std::rc::{Rc, Weak as RcWeak};
 pub use std::slice;
@@ -30,3 +34,8 @@ pub use std::sync::{
 pub use std::thread;
 pub use std::time::{self, Duration, Instant};
 pub use std::{f32, f64, str};
+
+pub use anyhow::{
+  bail, ensure, format_err, Context as ResultContextExt, Error as AnyError, Result as AnyResult,
+};
+pub use log::{debug, error, info, log, log_enabled, trace, warn};

@@ -1,6 +1,6 @@
-use super::{RawGL, SharedContext};
-use crate::math::{Color, Vec2};
+use crate::{RawGL, SharedContext};
 use ::gl::prelude::*;
+use cardboard_math::{Color, Vec2};
 use prelude_plus::*;
 
 gl_enum!({
@@ -276,8 +276,10 @@ impl_set_uniform!((f32, f32), (x, y), Uniform2f(x, y));
 impl_set_uniform!((i32, i32), (x, y), Uniform2i(x, y));
 impl_set_uniform!((u32, u32), (x, y), Uniform2i(x as i32, y as i32));
 impl_set_uniform!(Vec2<f32>, Vec2 { x, y }, Uniform2f(x, y));
+impl_set_uniform!(Vec2<i32>, Vec2 { x, y }, Uniform2i(x, y));
+impl_set_uniform!(Vec2<u32>, Vec2 { x, y }, Uniform2i(x as i32, y as i32));
 impl_set_uniform!(Color<f32>, Color { r, g, b, a }, Uniform4f(r, g, b, a));
-impl_set_uniform!(super::Texture2DBinding<'_>, tex, Uniform1i(tex.unit() as i32));
+impl_set_uniform!(crate::Texture2DBinding<'_>, tex, Uniform1i(tex.unit() as i32));
 
 gl_enum!({
   pub enum UniformType {
@@ -333,11 +335,11 @@ impl Attribute {
   pub fn data_type(&self) -> &Option<(AttributeType, u32)> { &self.data_type }
 
   #[inline(always)]
-  pub fn to_pointer(&self, config: super::AttributePtrConfig) -> super::AttributePtr {
+  pub fn to_pointer(&self, config: crate::AttributePtrConfig) -> crate::AttributePtr {
     if let Some((data_type, data_array_len)) = self.data_type {
       assert_eq!(config.len as u32, data_type.components() as u32 * data_array_len);
     }
-    super::AttributePtr::new(self.location, config)
+    crate::AttributePtr::new(self.location, config)
   }
 }
 

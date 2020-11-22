@@ -1,5 +1,5 @@
-use super::{RawGL, SharedContext};
-use ::gl::prelude::*;
+use crate::{RawGL, SharedContext};
+// use ::gl::prelude::*;
 use prelude_plus::*;
 
 gl_enum!({
@@ -13,6 +13,9 @@ pub struct Framebuffer {
   ctx: SharedContext,
   addr: u32,
 }
+
+impl !Send for Framebuffer {}
+impl !Sync for Framebuffer {}
 
 impl Framebuffer {
   pub const BIND_TARGET: BindFramebufferTarget = BindFramebufferTarget::Default;
@@ -52,4 +55,21 @@ impl<'tex> FramebufferBinding<'tex> {
   pub fn unbind_completely(self) {
     self.ctx().bound_framebuffer.unbind_unconditionally(self.raw_gl());
   }
+
+  pub fn status(&self) -> FramebufferStatus {
+    FramebufferStatus::from_raw(unsafe {
+      self.raw_gl().CheckFramebufferStatus(Self::BIND_TARGET.as_raw())
+    })
+    .unwrap()
+  }
 }
+
+gl_enum!({
+  pub enum FramebufferStatus {
+    Complete = FRAMEBUFFER_COMPLETE,
+    IncompleteAttachment = FRAMEBUFFER_INCOMPLETE_ATTACHMENT,
+    IncompleteDimensions = FRAMEBUFFER_INCOMPLETE_DIMENSIONS,
+    IncompleteMissingAttachment = FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT,
+    IncompleteUnsupported = FRAMEBUFFER_UNSUPPORTED,
+  }
+});
