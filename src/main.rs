@@ -47,10 +47,11 @@ const RACKET_MAX_SPEED: f32 = 800.0;
 const RACKET_ACCELERATION: f32 = 8.0;
 const RACKET_SLOWDOWN: f32 = 12.0;
 const RACKET_SPEED_EPSILON: f32 = 1.0;
+const BOT_RACKET_VISION_DISTANCE: f32 = 1.0 / 2.0;
 
 const BALL_RADIUS: f32 = 40.0;
 const BALL_ROTATION_SPEED: f32 = 1.0;
-const BALL_MAX_SPEED: f32 = 1000.0;
+const BALL_MAX_SPEED: f32 = 1400.0;
 const BALL_MAX_VEL_DEVIATION_ANGLE: f32 = (/* 90 deg */f32::consts::FRAC_PI_2) * (2.0 / 3.0);
 const BALL_THROW_DISTANCE_FROM_RACKET: f32 = RACKET_SIZE.y;
 
@@ -316,7 +317,10 @@ impl RacketController {
       }
 
       Self::Bot => {
-        if ball.coll.vel.x * racket.side > 0.0 {
+        let vision_dist = BOT_RACKET_VISION_DISTANCE * globals.window_size.x;
+        if ball.coll.vel.x * racket.side > 0.0
+          && (racket.coll.pos.x - ball.coll.pos.x).abs() <= vision_dist
+        {
           dir = (ball.coll.pos.y - racket.coll.pos.y).signum();
         }
       }
