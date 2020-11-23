@@ -218,7 +218,7 @@ macro_rules! impl_vec2 {
       pub fn perpendicular_ccw(self) -> Self { Self { x: -self.y, y: self.x } }
 
       #[inline]
-      pub fn rotation_sign(self, rhs: Self) -> $ty { (self.x * rhs.y - self.y * rhs.x).signum() }
+      pub fn angle_sign(self, rhs: Self) -> $ty { (self.x * rhs.y - self.y * rhs.x).signum() }
     }
 
     impl Clamp2Abs<$ty> for Vec2<$ty> {
@@ -258,7 +258,10 @@ macro_rules! impl_vec2 {
       pub fn clamp_magnitude(self, max_magnitude: $ty) -> Self {
         let sqr_magnitude = self.sqr_magnitude();
         if sqr_magnitude > max_magnitude * max_magnitude {
-          self.with_magnitude(max_magnitude)
+          // NOTE: The minimum value of `max_magnitude * max_magnitude` is
+          // zero, therefore (due to the strict greater-than comparison)
+          // `sqr_magnitude` can be assumed to be non-zero.
+          (self / sqr_magnitude.sqrt()) * max_magnitude
         } else {
           self
         }
@@ -271,7 +274,7 @@ macro_rules! impl_vec2 {
       pub fn angle_normalized(self, rhs: Self) -> $ty { self.dot(rhs).clamp2(-1.0, 1.0).acos() }
       #[inline]
       pub fn signed_angle_normalized(self, rhs: Self) -> $ty {
-        self.angle_normalized(rhs) * self.rotation_sign(rhs)
+        self.angle_normalized(rhs) * self.angle_sign(rhs)
       }
 
       #[inline]
@@ -284,10 +287,10 @@ macro_rules! impl_vec2 {
         }
       }
       #[inline]
-      pub fn signed_angle(self, rhs: Self) -> $ty { self.angle(rhs) * self.rotation_sign(rhs) }
+      pub fn signed_angle(self, rhs: Self) -> $ty { self.angle(rhs) * self.angle_sign(rhs) }
 
       #[inline]
-      pub fn rotate(self, angle: $ty) -> Self {
+      pub fn rotated(self, angle: $ty) -> Self {
         let s = angle.sin();
         let c = angle.cos();
         Self {

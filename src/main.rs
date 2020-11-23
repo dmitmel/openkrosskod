@@ -51,6 +51,7 @@ const RACKET_SPEED_EPSILON: f32 = 1.0;
 const BALL_RADIUS: f32 = 40.0;
 const BALL_ROTATION_SPEED: f32 = 1.0;
 const BALL_MAX_SPEED: f32 = 1000.0;
+const BALL_MAX_VEL_DEVIATION_ANGLE: f32 = (/* 90 deg */f32::consts::PI / 2.0) * (3.0 / 4.0);
 
 fn breakpoint() {
   use nix::sys::signal;
@@ -142,6 +143,7 @@ fn try_main() -> AnyResult<()> {
       time: 0.0,
       delta_time: 0.0,
       fixed_time: 0.0,
+      // TODO: reduce the timestep from 120 UPS to 60 UPS
       fixed_delta_time: 1.0 / 60.0 / 2.0,
 
       window_size_i,
@@ -250,8 +252,7 @@ impl Ball {
       coll: CollEntry {
         id,
         size: vec2n(BALL_RADIUS * 2.0),
-        // vel: vec2::<f32>(0.8, 0.5).normalized() * BALL_MAX_SPEED,
-        vel: vec2::<f32>(0.8, 0.0).normalized() * BALL_MAX_SPEED,
+        vel: vec2::<f32>(1.0, 0.0) * BALL_MAX_SPEED,
         // max_speed: BALL_MAX_SPEED / 4.0,
         max_speed: BALL_MAX_SPEED,
         ..Default::default()
@@ -408,6 +409,8 @@ impl Game {
   pub fn update(&mut self) {}
 
   pub fn fixed_update(&mut self) {
+    self.debug_vectors.clear();
+
     let fixed_delta_time = self.globals.fixed_delta_time as f32;
     let window_size = self.globals.window_size;
 
@@ -442,17 +445,26 @@ impl Game {
       }
 
       ball.rotation += ball.rotation_speed * f32::consts::TAU * fixed_delta_time;
+
+      let vel = &mut ball.coll.vel;
+      let vel_magnitude = vel.magnitude();
+
+      if vel_magnitude != 0.0 {
+        let vel_guide = vec2(vel.x.signum(), 0.0);
+        let vel_angle = vel_guide.angle_normalized(*vel / vel_magnitude);
+        if vel_angle >= BALL_MAX_VEL_DEVIATION_ANGLE {
+          let sign = vel_guide.angle_sign(*vel);
+          *vel = vel_guide.rotated(BALL_MAX_VEL_DEVIATION_ANGLE * sign) * vel_magnitude;
+        }
+      }
     }
 
     for coll in &mut [&mut left_racket.coll, &mut right_racket.coll, &mut ball.coll] {
-      coll.vel += if coll.accel != vec2n(0.0) { coll.accel } else { -coll.vel * coll.slowdown }
+      coll.vel += if !coll.accel.is_zero() { coll.accel } else { -coll.vel * coll.slowdown }
         * fixed_delta_time;
 
-      let vel_sqr_magnitude = coll.vel.sqr_magnitude();
-      if vel_sqr_magnitude > coll.max_speed * coll.max_speed {
-        coll.vel = coll.vel.normalized() * coll.max_speed
-      }
-      if vel_sqr_magnitude < RACKET_SPEED_EPSILON * RACKET_SPEED_EPSILON {
+      coll.vel = coll.vel.clamp_magnitude(coll.max_speed);
+      if coll.vel.sqr_magnitude() < RACKET_SPEED_EPSILON * RACKET_SPEED_EPSILON {
         coll.vel = vec2n(0.0);
       }
 
@@ -500,7 +512,7 @@ impl Game {
             }
 
             ball.coll.vel =
-              (ball.coll.vel + racket.coll.vel / 2.0).normalized() * ball.coll.max_speed;
+              (ball.coll.vel + racket.coll.vel).with_magnitude(ball.coll.vel.magnitude());
           }
         } else {
           *current_collider = None;
@@ -559,7 +571,7 @@ impl Game {
     });
 
     // TODO: remove
-    for (start_point, vector, color) in self.debug_vectors.drain(..) {
+    for &(start_point, vector, color) in &self.debug_vectors {
       let angle = vector.angle_from_x_axis();
 
       self.renderer.draw_shape(&mut Shape {
