@@ -61,6 +61,9 @@ impl GlobalRandom {
   pub fn next_f64(&self) -> f64 { unsafe { &mut *self.0.get() }.rand_float() }
 
   #[inline]
+  pub fn next_bool(&self) -> bool { self.next_u64() & 1 != 0 }
+
+  #[inline]
   pub fn next_u64_in_range(&self, range: Range<u64>) -> u64 {
     assert!(range.start < range.end);
     unsafe { &mut *self.0.get() }.rand_range(range)

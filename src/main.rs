@@ -51,7 +51,7 @@ const RACKET_SPEED_EPSILON: f32 = 1.0;
 const BALL_RADIUS: f32 = 40.0;
 const BALL_ROTATION_SPEED: f32 = 1.0;
 const BALL_MAX_SPEED: f32 = 1000.0;
-const BALL_MAX_VEL_DEVIATION_ANGLE: f32 = (/* 90 deg */f32::consts::PI / 2.0) * (3.0 / 4.0);
+const BALL_MAX_VEL_DEVIATION_ANGLE: f32 = (/* 90 deg */f32::consts::FRAC_PI_2) * (2.0 / 3.0);
 
 fn breakpoint() {
   use nix::sys::signal;
@@ -162,13 +162,21 @@ fn try_main() -> AnyResult<()> {
   let renderer =
     Renderer::init(Rc::clone(&globals)).context("Failed to initialize the renderer")?;
 
+  let state = {
+    let mut left_racket = Racket::new(1, -1.0);
+    let mut right_racket = Racket::new(2, 1.0);
+    left_racket.update_pos(&globals);
+    right_racket.update_pos(&globals);
+
+    let mut ball = Ball::new(3);
+    ball.throw_at(if globals.random.next_bool() { &left_racket } else { &right_racket });
+
+    GameState { left_racket, right_racket, ball }
+  };
+
   let mut game = Game {
     globals,
-    state: GameState {
-      left_racket: Racket::new(1),
-      right_racket: Racket::new(2),
-      ball: Ball::new(3),
-    },
+    state,
 
     sdl_context,
     video_subsystem,
@@ -220,11 +228,12 @@ impl CollEntry {
 #[derive(Debug)]
 struct Racket {
   pub coll: CollEntry,
+  pub side: f32,
   pub score: u32,
 }
 
 impl Racket {
-  fn new(id: EntityId) -> Self {
+  fn new(id: EntityId, side: f32) -> Self {
     Self {
       coll: CollEntry {
         id,
@@ -233,8 +242,14 @@ impl Racket {
         slowdown: RACKET_SLOWDOWN,
         ..Default::default()
       },
+      side,
       score: 0,
     }
+  }
+
+  fn update_pos(&mut self, globals: &Globals) {
+    self.coll.pos.x =
+      self.side * (globals.window_size.x / 2.0 - self.coll.size.x / 2.0 - RACKET_OFFSET);
   }
 }
 
@@ -252,8 +267,7 @@ impl Ball {
       coll: CollEntry {
         id,
         size: vec2n(BALL_RADIUS * 2.0),
-        vel: vec2::<f32>(1.0, 0.0) * BALL_MAX_SPEED,
-        // max_speed: BALL_MAX_SPEED / 4.0,
+        vel: vec2n(0.0),
         max_speed: BALL_MAX_SPEED,
         ..Default::default()
       },
@@ -261,6 +275,11 @@ impl Ball {
       rotation_speed: BALL_ROTATION_SPEED,
       currently_colliding_with: None,
     }
+  }
+
+  fn throw_at(&mut self, racket: &Racket) {
+    self.coll.pos = vec2n(0.0);
+    self.coll.vel = (racket.coll.pos - self.coll.pos).with_magnitude(BALL_MAX_SPEED);
   }
 }
 
@@ -397,11 +416,8 @@ impl Game {
     }
 
     if self.globals.window_was_resized {
-      for (racket, side) in
-        &mut [(&mut self.state.left_racket, -1.0), (&mut self.state.right_racket, 1.0)]
-      {
-        racket.coll.pos.x =
-          *side * (self.globals.window_size.x / 2.0 - racket.coll.size.x / 2.0 - RACKET_OFFSET);
+      for racket in &mut [&mut self.state.left_racket, &mut self.state.right_racket] {
+        racket.update_pos(&self.globals);
       }
     }
   }
@@ -433,11 +449,11 @@ impl Game {
     {
       let window_bouncing_bounds: Vec2f = window_size / 2.0 - ball.coll.size / 2.0;
 
-      if ball.coll.pos.x.abs() >= window_bouncing_bounds.x {
-        let racket = if ball.coll.pos.x >= 0.0 { &mut *right_racket } else { &mut *left_racket };
-        racket.score += 1;
-        ball.coll.vel.x = -ball.coll.vel.x;
-        // ball.coll.pos = vec2n(0.0);
+      if ball.coll.pos.x.abs() >= window_bouncing_bounds.x + ball.coll.size.x * 2.0 {
+        let winner_racket =
+          if ball.coll.pos.x >= 0.0 { &mut *left_racket } else { &mut *right_racket };
+        winner_racket.score += 1;
+        ball.throw_at(winner_racket);
       }
 
       if ball.coll.pos.y.abs() >= window_bouncing_bounds.y {
@@ -469,7 +485,7 @@ impl Game {
       }
 
       coll.pos += coll.vel * fixed_delta_time;
-      coll.pos = coll.pos.clamp2_abs((window_size / 2.0 - coll.size / 2.0).abs())
+      coll.pos.y = coll.pos.y.clamp2_abs((window_size.y / 2.0 - coll.size.y / 2.0).abs())
     }
 
     // dbg!(left_racket.coll.vel, right_racket.coll.vel);
