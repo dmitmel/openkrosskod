@@ -43,7 +43,7 @@ const RACKET_SIZE: Vec2f = vec2(20.0, 200.0);
 const RACKET_OFFSET: f32 = 2.0 * RACKET_SIZE.x + BALL_RADIUS;
 const RACKET_COLOR: Colorf = colorn(0.9, 1.0);
 
-const RACKET_MAX_SPEED: f32 = 800.0;
+const RACKET_MAX_SPEED: f32 = 1000.0;
 const RACKET_ACCELERATION: f32 = 8.0;
 const RACKET_SLOWDOWN: f32 = 12.0;
 const RACKET_SPEED_EPSILON: f32 = 1.0;
