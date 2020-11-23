@@ -52,6 +52,7 @@ const BALL_RADIUS: f32 = 40.0;
 const BALL_ROTATION_SPEED: f32 = 1.0;
 const BALL_MAX_SPEED: f32 = 1000.0;
 const BALL_MAX_VEL_DEVIATION_ANGLE: f32 = (/* 90 deg */f32::consts::FRAC_PI_2) * (2.0 / 3.0);
+const BALL_THROW_DISTANCE_FROM_RACKET: f32 = RACKET_SIZE.y;
 
 fn breakpoint() {
   use nix::sys::signal;
@@ -174,7 +175,7 @@ fn try_main() -> AnyResult<()> {
     );
 
     let mut ball = Ball::new(3);
-    ball.throw_at(if globals.random.next_bool() { &left_racket } else { &right_racket });
+    ball.throw_at(&globals, if globals.random.next_bool() { &left_racket } else { &right_racket });
 
     GameState { left_racket, left_racket_controller, right_racket, right_racket_controller, ball }
   };
@@ -284,9 +285,13 @@ impl Ball {
     }
   }
 
-  fn throw_at(&mut self, racket: &Racket) {
-    self.coll.pos = vec2n(0.0);
-    self.coll.vel = (racket.coll.pos - self.coll.pos).with_magnitude(BALL_MAX_SPEED);
+  fn throw_at(&mut self, globals: &Globals, racket: &Racket) {
+    let dist = BALL_THROW_DISTANCE_FROM_RACKET;
+    self.coll.pos = racket.coll.pos - vec2(racket.side * (dist + racket.coll.size.x / 2.0), 0.0);
+
+    let max_angle = ((racket.coll.size.y / 2.0) / dist).atan();
+    let angle = (globals.random.next_f32() * 2.0 - 1.0) * max_angle;
+    self.coll.vel = vec2(racket.side, 0.0).rotated(angle) * BALL_MAX_SPEED;
   }
 }
 
@@ -492,7 +497,7 @@ impl Game {
         let winner_racket =
           if ball.coll.pos.x >= 0.0 { &mut *left_racket } else { &mut *right_racket };
         winner_racket.score += 1;
-        ball.throw_at(winner_racket);
+        ball.throw_at(&self.globals, winner_racket);
       }
 
       if ball.coll.pos.y.abs() >= window_bouncing_bounds.y {
