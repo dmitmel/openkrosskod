@@ -163,15 +163,20 @@ fn try_main() -> AnyResult<()> {
     Renderer::init(Rc::clone(&globals)).context("Failed to initialize the renderer")?;
 
   let state = {
-    let mut left_racket = Racket::new(1, -1.0);
-    let mut right_racket = Racket::new(2, 1.0);
+    let (mut left_racket, mut right_racket) = (Racket::new(1, -1.0), Racket::new(2, 1.0));
     left_racket.update_pos(&globals);
     right_racket.update_pos(&globals);
+
+    let (left_racket_controller, right_racket_controller) = (
+      // RacketController::Player { key_up: Scancode::W, key_down: Scancode::S },
+      RacketController::Bot,
+      RacketController::Player { key_up: Scancode::Up, key_down: Scancode::Down },
+    );
 
     let mut ball = Ball::new(3);
     ball.throw_at(if globals.random.next_bool() { &left_racket } else { &right_racket });
 
-    GameState { left_racket, right_racket, ball }
+    GameState { left_racket, left_racket_controller, right_racket, right_racket_controller, ball }
   };
 
   let mut game = Game {
@@ -204,7 +209,9 @@ fn try_main() -> AnyResult<()> {
 #[derive(Debug)]
 struct GameState {
   pub left_racket: Racket,
+  pub left_racket_controller: RacketController,
   pub right_racket: Racket,
+  pub right_racket_controller: RacketController,
   pub ball: Ball,
 }
 
@@ -280,6 +287,37 @@ impl Ball {
   fn throw_at(&mut self, racket: &Racket) {
     self.coll.pos = vec2n(0.0);
     self.coll.vel = (racket.coll.pos - self.coll.pos).with_magnitude(BALL_MAX_SPEED);
+  }
+}
+
+#[derive(Debug)]
+enum RacketController {
+  Player { key_up: Scancode, key_down: Scancode },
+  Bot,
+}
+
+impl RacketController {
+  fn get_movement_direction(&mut self, globals: &Globals, racket: &Racket, ball: &Ball) -> f32 {
+    let mut dir = 0.0;
+
+    match self {
+      Self::Player { key_up, key_down } => {
+        if globals.input_state.is_key_down(*key_up) {
+          dir += 1.0;
+        }
+        if globals.input_state.is_key_down(*key_down) {
+          dir -= 1.0;
+        }
+      }
+
+      Self::Bot => {
+        if ball.coll.vel.x * racket.side > 0.0 {
+          dir = (ball.coll.pos.y - racket.coll.pos.y).signum();
+        }
+      }
+    }
+
+    dir
   }
 }
 
@@ -430,19 +468,20 @@ impl Game {
     let fixed_delta_time = self.globals.fixed_delta_time as f32;
     let window_size = self.globals.window_size;
 
-    let GameState { ball, left_racket, right_racket, .. } = &mut self.state;
+    let GameState {
+      ball,
+      left_racket,
+      left_racket_controller,
+      right_racket,
+      right_racket_controller,
+      ..
+    } = &mut self.state;
 
-    for (racket, key_up, key_down) in &mut [
-      (&mut *left_racket, Scancode::W, Scancode::S),
-      (&mut *right_racket, Scancode::Up, Scancode::Down),
+    for (racket, controller) in &mut [
+      (&mut *left_racket, &mut *left_racket_controller),
+      (&mut *right_racket, &mut *right_racket_controller),
     ] {
-      let mut dir = 0.0;
-      if self.globals.input_state.is_key_down(*key_up) {
-        dir += 1.0;
-      }
-      if self.globals.input_state.is_key_down(*key_down) {
-        dir -= 1.0;
-      }
+      let dir = controller.get_movement_direction(&self.globals, &racket, &ball);
       racket.coll.accel.y = dir * RACKET_MAX_SPEED * RACKET_ACCELERATION;
     }
 
@@ -464,7 +503,6 @@ impl Game {
 
       let vel = &mut ball.coll.vel;
       let vel_magnitude = vel.magnitude();
-
       if vel_magnitude != 0.0 {
         let vel_guide = vec2(vel.x.signum(), 0.0);
         let vel_angle = vel_guide.angle_normalized(*vel / vel_magnitude);
