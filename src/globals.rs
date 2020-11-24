@@ -22,6 +22,7 @@ pub struct Globals {
   pub window_size_i: Vec2<u32>,
   pub window_size: Vec2f,
   pub window_was_resized: bool,
+  pub window_is_focused: bool,
 
   pub input_state: InputState,
 }

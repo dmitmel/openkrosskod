@@ -34,6 +34,8 @@ const GL_CONTEXT_VERSION: (u8, u8) = (2, 0);
 const DEFAULT_WINDOW_SIZE: Vec2<u32> = vec2(568 * 2, 320 * 2);
 const BACKGROUND_COLOR: Colorf = colorn(0.1, 1.0);
 
+const GAME_LOOP_IDLING_WAIT_INTERVAL: f64 = 1.0 / 20.0;
+
 const FONT_CHAR_GRID_SIZE: Vec2<u32> = vec2(4, 6);
 const FONT_CHAR_SIZE: Vec2<u32> = vec2(3, 5);
 const SCORE_LABEL_CHAR_SPACING: Vec2f = vec2n(1.0 / 3.0);
@@ -151,6 +153,7 @@ fn try_main() -> AnyResult<()> {
       window_size_i,
       window_size: window_size_i.cast_into(),
       window_was_resized: true,
+      window_is_focused: true,
 
       input_state: input::InputState::new(),
     }
@@ -204,7 +207,7 @@ fn try_main() -> AnyResult<()> {
   };
 
   let result = game.start_loop();
-  info!("Goodbye");
+  info!("Bye!");
   result
 }
 
@@ -350,6 +353,7 @@ impl Game {
   pub fn start_loop(&mut self) -> AnyResult<()> {
     let mut prev_time = Instant::now();
     let mut fixed_update_time_accumulator = 0.0;
+    let mut idling = false;
 
     fn mut_globals(this: &mut Game) -> &mut Globals {
       unsafe { Rc::get_mut_unchecked(&mut this.globals) }
@@ -365,27 +369,39 @@ impl Game {
       }
 
       self.process_input();
-
-      self.early_update();
-
-      fixed_update_time_accumulator += delta_time;
-      let fixed_delta_time = self.globals.fixed_delta_time;
-      // FIXME: What if a lot of time has passed between frames, e.g. due to the
-      // game being suspended or paused with SIGSTOP (and resumed with SIGCONT)?
-      while fixed_update_time_accumulator >= fixed_delta_time {
-        mut_globals(self).fixed_time += fixed_delta_time;
-        self.fixed_update();
-        fixed_update_time_accumulator -= fixed_delta_time;
+      let window_is_focused = self.globals.window_is_focused;
+      if window_is_focused {
+        idling = false;
       }
 
-      self.update();
+      if !idling {
+        self.early_update();
 
-      if cfg!(feature = "gl_debug_all_commands") {
-        println!("================ [OpenGL] ================");
+        fixed_update_time_accumulator += delta_time;
+        let fixed_delta_time = self.globals.fixed_delta_time;
+        // FIXME: What if a lot of time has passed between frames, e.g. due to the
+        // game being suspended or paused with SIGSTOP (and resumed with SIGCONT)?
+        while fixed_update_time_accumulator >= fixed_delta_time {
+          mut_globals(self).fixed_time += fixed_delta_time;
+          self.fixed_update();
+          fixed_update_time_accumulator -= fixed_delta_time;
+        }
+
+        self.update();
+
+        if cfg!(feature = "gl_debug_all_commands") {
+          println!("================ [OpenGL] ================");
+        }
+
+        self.render();
+        self.window.gl_swap_window();
+      } else {
+        thread::sleep(Duration::from_secs_f64(GAME_LOOP_IDLING_WAIT_INTERVAL));
       }
 
-      self.render();
-      self.window.gl_swap_window();
+      if !window_is_focused {
+        idling = true;
+      }
 
       mut_globals(self).first_game_loop_tick = false;
       prev_time = current_time;
@@ -419,6 +435,18 @@ impl Game {
           if window_id == main_window_id =>
         {
           globals.should_stop_game_loop.set(true);
+        }
+
+        Event::Window { window_id, win_event: WindowEvent::FocusGained, .. }
+          if window_id == main_window_id =>
+        {
+          globals.window_is_focused = true;
+        }
+
+        Event::Window { window_id, win_event: WindowEvent::FocusLost, .. }
+          if window_id == main_window_id =>
+        {
+          globals.window_is_focused = false;
         }
 
         Event::Window { window_id, win_event: WindowEvent::SizeChanged(w, h), .. }
@@ -652,6 +680,17 @@ impl Game {
         size: vec2n(32.0),
         rotation: angle,
         fill: ShapeFill::Color(color),
+        fill_clipping: None,
+      });
+    }
+
+    if !self.globals.window_is_focused {
+      self.renderer.draw_shape(&mut Shape {
+        type_: ShapeType::Rectangle,
+        pos: vec2n(0.0),
+        size: window_size,
+        rotation: 0.0,
+        fill: ShapeFill::Color(color(0.0, 0.0, 0.0, 0.6)),
         fill_clipping: None,
       });
     }
