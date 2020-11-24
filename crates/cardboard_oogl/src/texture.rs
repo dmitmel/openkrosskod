@@ -133,7 +133,7 @@ impl<'obj> Texture2DBinding<'obj> {
     &self,
     level_of_detail: u32,
     format: TextureInputFormat,
-    internal_format: TextureInternalFormat,
+    internal_format_preference: Option<TextureInternalFormat>,
     size: Vec2<u32>,
     data: &[u8],
   ) {
@@ -147,7 +147,7 @@ impl<'obj> Texture2DBinding<'obj> {
     self.set_data_internal(
       level_of_detail,
       format,
-      internal_format,
+      internal_format_preference,
       size,
       data.as_ptr() as *const _,
     );
@@ -157,7 +157,7 @@ impl<'obj> Texture2DBinding<'obj> {
     &self,
     level_of_detail: u32,
     format: TextureInputFormat,
-    internal_format: TextureInternalFormat,
+    internal_format_preference: Option<TextureInternalFormat>,
     size: Vec2<u32>,
   ) {
     let ctx = self.ctx();
@@ -166,17 +166,19 @@ impl<'obj> Texture2DBinding<'obj> {
     assert!(size.x <= max_size);
     assert!(size.y <= max_size);
 
-    self.set_data_internal(level_of_detail, format, internal_format, size, ptr::null());
+    self.set_data_internal(level_of_detail, format, internal_format_preference, size, ptr::null());
   }
 
   fn set_data_internal(
     &self,
     level_of_detail: u32,
     format: TextureInputFormat,
-    internal_format: TextureInternalFormat,
+    internal_format_preference: Option<TextureInternalFormat>,
     size: Vec2<u32>,
     data_ptr: *const c_void,
   ) {
+    let internal_format =
+      internal_format_preference.unwrap_or_else(|| format.ideal_internal_format());
     unsafe {
       self.ctx().raw_gl().TexImage2D(
         Self::BIND_TARGET.as_raw(),
@@ -244,7 +246,7 @@ gl_enum!({
 });
 
 impl TextureInternalFormat {
-  pub fn color_components(&self) -> u8 {
+  pub fn color_components(self) -> u8 {
     match self {
       Self::Alpha | Self::Luminance => 1,
       Self::LuminanceAlpha => 2,
@@ -265,12 +267,23 @@ gl_enum!({
 });
 
 impl TextureInputFormat {
-  pub fn color_components(&self) -> u8 {
+  pub fn color_components(self) -> u8 {
     match self {
       Self::Alpha | Self::Luminance => 1,
       Self::LuminanceAlpha => 2,
       Self::RGB => 3,
       Self::RGBA => 4,
+    }
+  }
+
+  pub fn ideal_internal_format(self) -> TextureInternalFormat {
+    use TextureInternalFormat as Int;
+    match self {
+      Self::Alpha => Int::Alpha,
+      Self::RGB => Int::RGB,
+      Self::RGBA => Int::RGBA,
+      Self::Luminance => Int::Luminance,
+      Self::LuminanceAlpha => Int::LuminanceAlpha,
     }
   }
 }

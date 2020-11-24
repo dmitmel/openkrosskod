@@ -405,17 +405,17 @@ macro_rules! program_reflection_block {
   ({$($tt:tt)+}) => { $crate::program_reflection_block! { $($tt)+ } };
 
   (
-    $(#[$struct_meta:meta])* $enum_visibility:vis struct $struct_name:ident {
+    $(#[$struct_meta:meta])* $struct_visibility:vis struct $struct_name:ident {
       $($(#[$field_meta:meta])* $field_visibility:vis $field_name:ident: $field_type:ty),+ $(,)?
     }
   ) => {
     $(#[$struct_meta])*
-    $enum_visibility struct $struct_name {
+    $struct_visibility struct $struct_name {
       $($(#[$field_meta])* $field_visibility $field_name: $field_type),+
     }
 
     impl $struct_name {
-      $enum_visibility fn new(program: &$crate::Program) -> Self {
+      $struct_visibility fn new(program: &$crate::Program) -> Self {
         Self {
           $($field_name: <$field_type>::reflect_from(
             program, stringify!($field_name).as_bytes())),+

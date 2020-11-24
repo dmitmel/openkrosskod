@@ -171,6 +171,11 @@ macro_rules! impl_vec2 {
       }
 
       #[inline]
+      pub fn mul_components(self) -> $ty {
+        self.x * self.y
+      }
+
+      #[inline]
       pub fn reflected_normal(self, normal: Self) -> Self {
         self - (2 as $ty) * self.dot(normal) * normal
       }

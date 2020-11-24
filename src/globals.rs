@@ -84,6 +84,20 @@ impl GlobalRandom {
     // resulting values, nor their distribution are distorted.
     (unsigned_random as i64).wrapping_sub(i64::MIN)
   }
+
+  pub fn fill_bytes(&self, mut out: &mut [u8]) {
+    // This is the most optimal implementation I could come up with. Index
+    // bounds checks are eliminated by the optimizer in the generated assembly
+    // for this function (unlike in an implementation with an index incremented
+    // by the block size on each iteration), hence it is basically equivalent
+    // to using unsafe code, namely `ptr::copy_nonoverlapping`.
+    while !out.is_empty() {
+      let block = self.next_u64().to_le_bytes();
+      let out_block_len = out.len().min(block.len());
+      out[..out_block_len].copy_from_slice(&block[..out_block_len]);
+      out = &mut out[out_block_len..];
+    }
+  }
 }
 
 #[rustfmt::skip]

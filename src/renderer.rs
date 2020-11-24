@@ -80,7 +80,7 @@ impl Renderer {
       bound_texture.set_data(
         0,
         oogl::TextureInputFormat::RGBA,
-        oogl::TextureInternalFormat::RGBA,
+        None,
         vec2n(1),
         &[0xFF, 0xFF, 0xFF, 0xFF],
       )
@@ -366,7 +366,6 @@ pub fn load_texture_data_from_png<R: Read>(
   let mut buf = vec![0; info.buffer_size()];
   reader.next_frame(&mut buf)?;
 
-  use oogl::{TextureInputFormat, TextureInternalFormat};
   use png::{BitDepth, ColorType};
 
   match info.bit_depth {
@@ -374,23 +373,16 @@ pub fn load_texture_data_from_png<R: Read>(
     _ => unimplemented!("Unsupported texture bit depth: {:?}", info.bit_depth),
   }
 
-  let (gl_format, gl_internal_format) = match info.color_type {
-    ColorType::Grayscale => (TextureInputFormat::Luminance, TextureInternalFormat::Luminance),
-    ColorType::RGB => (TextureInputFormat::RGB, TextureInternalFormat::RGB),
-    ColorType::GrayscaleAlpha => {
-      (TextureInputFormat::LuminanceAlpha, TextureInternalFormat::LuminanceAlpha)
-    }
-    ColorType::RGBA => (TextureInputFormat::RGBA, TextureInternalFormat::RGBA),
+  use oogl::TextureInputFormat as GlFormat;
+  let gl_format = match info.color_type {
+    ColorType::Grayscale => GlFormat::Luminance,
+    ColorType::RGB => GlFormat::RGB,
+    ColorType::GrayscaleAlpha => GlFormat::LuminanceAlpha,
+    ColorType::RGBA => GlFormat::RGBA,
     _ => unimplemented!("Unsupported texture color type: {:?}", info.color_type),
   };
 
-  bound_texture.set_data(
-    level_of_detail,
-    gl_format,
-    gl_internal_format,
-    vec2(info.width, info.height),
-    &buf,
-  );
+  bound_texture.set_data(level_of_detail, gl_format, None, vec2(info.width, info.height), &buf);
 
   Ok(vec2(info.width, info.height))
 }
