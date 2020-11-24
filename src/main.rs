@@ -79,7 +79,6 @@ fn try_main() -> AnyResult<()> {
   info!("{} v{} ({})", GAME_NAME, GAME_VERSION, GAME_ENGINE_NAME);
 
   let game_fs = GameFs::init().context("Failed to initialize GameFs")?;
-  info!("Installation directory: '{}'", game_fs.installation_dir.display());
 
   let random =
     GlobalRandom::init().context("Failed to initialize a random number generator (RNG)")?;
