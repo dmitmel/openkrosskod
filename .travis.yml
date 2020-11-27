@@ -1,6 +1,6 @@
 os: linux
 language: rust
-rust: nightly
+rust: stable
 cache: cargo
 
 jobs:
@@ -11,7 +11,8 @@ jobs:
           packages:
             - libsdl2-dev
       before_script:
-        - rustup component add rustfmt clippy
+        - rustup toolchain install nightly --allow-downgrade --component rustfmt clippy
+        - rustup default nightly
       script:
         - cargo build  --workspace --verbose --all-targets
         - cargo test   --workspace --verbose
