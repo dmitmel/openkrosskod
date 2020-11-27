@@ -66,7 +66,7 @@ impl Context {
 
   pub fn clear(&self, flags: ClearFlags) { unsafe { self.raw_gl.Clear(flags.bits()) }; }
 
-  pub fn set_viewport(&self, pos: Vec2<i32>, size: Vec2<i32>) {
+  pub fn set_viewport(&self, pos: Vec2i32, size: Vec2i32) {
     unsafe { self.raw_gl.Viewport(pos.x, pos.y, size.x, size.y) };
   }
 

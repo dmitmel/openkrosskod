@@ -25,6 +25,22 @@ impl<T: fmt::Debug> fmt::Debug for Vec2<T> {
 pub type Vec2d = Vec2<f64>;
 pub type Vec2f = Vec2<f32>;
 
+pub type Vec2bool = Vec2<bool>;
+pub type Vec2u8 = Vec2<u8>;
+pub type Vec2i8 = Vec2<i8>;
+pub type Vec2u16 = Vec2<u16>;
+pub type Vec2i16 = Vec2<i16>;
+pub type Vec2u32 = Vec2<u32>;
+pub type Vec2i32 = Vec2<i32>;
+pub type Vec2u64 = Vec2<u64>;
+pub type Vec2i64 = Vec2<i64>;
+pub type Vec2u128 = Vec2<u128>;
+pub type Vec2i128 = Vec2<i128>;
+pub type Vec2usize = Vec2<usize>;
+pub type Vec2isize = Vec2<isize>;
+pub type Vec2f32 = Vec2<f32>;
+pub type Vec2f64 = Vec2<f64>;
+
 #[inline(always)]
 pub const fn vec2<T>(x: T, y: T) -> Vec2<T> { Vec2 { x, y } }
 

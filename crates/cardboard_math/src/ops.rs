@@ -80,11 +80,11 @@ pub trait NumCastInto<T>: Sized {
 
 macro_rules! impl_num_cast_from {
   (all) => {
-    impl_num_cast_from!(all: u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 f32 f64);
+    impl_num_cast_from!(all: u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 f32 f64 usize isize);
   };
 
   (all: $($into_ty:ty)+) => {
-    $(impl_num_cast_from!($into_ty: u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 f32 f64);)+
+    $(impl_num_cast_from!($into_ty: u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 f32 f64 usize isize);)+
   };
 
   ($into_ty:ty: $($from_ty:ty)+) => {

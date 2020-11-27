@@ -31,13 +31,13 @@ const GAME_ENGINE_NAME: &str = "Cardboard Engine, \"The Third Impact\" revision"
 const GL_CONTEXT_PROFILE: GLProfile = GLProfile::GLES;
 const GL_CONTEXT_VERSION: (u8, u8) = (2, 0);
 
-const DEFAULT_WINDOW_SIZE: Vec2<u32> = vec2(568 * 2, 320 * 2);
+const DEFAULT_WINDOW_SIZE: Vec2u32 = vec2(568 * 2, 320 * 2);
 const BACKGROUND_COLOR: Colorf = colorn(0.1, 1.0);
 
 const GAME_LOOP_IDLING_WAIT_INTERVAL: f64 = 1.0 / 20.0;
 
-const FONT_CHAR_GRID_SIZE: Vec2<u32> = vec2(4, 6);
-const FONT_CHAR_SIZE: Vec2<u32> = vec2(3, 5);
+const FONT_CHAR_GRID_SIZE: Vec2u32 = vec2(4, 6);
+const FONT_CHAR_SIZE: Vec2u32 = vec2(3, 5);
 const SCORE_LABEL_CHAR_SPACING: Vec2f = vec2n(1.0 / 3.0);
 const SCORE_LABEL_TEXT_SCALE: Vec2f = vec2n(16.0);
 

@@ -134,7 +134,7 @@ impl<'obj> Texture2DBinding<'obj> {
     level_of_detail: u32,
     format: TextureInputFormat,
     internal_format_preference: Option<TextureInternalFormat>,
-    size: Vec2<u32>,
+    size: Vec2u32,
     data: &[u8],
   ) {
     let ctx = self.ctx();
@@ -158,7 +158,7 @@ impl<'obj> Texture2DBinding<'obj> {
     level_of_detail: u32,
     format: TextureInputFormat,
     internal_format_preference: Option<TextureInternalFormat>,
-    size: Vec2<u32>,
+    size: Vec2u32,
   ) {
     let ctx = self.ctx();
 
@@ -174,7 +174,7 @@ impl<'obj> Texture2DBinding<'obj> {
     level_of_detail: u32,
     format: TextureInputFormat,
     internal_format_preference: Option<TextureInternalFormat>,
-    size: Vec2<u32>,
+    size: Vec2u32,
     data_ptr: *const c_void,
   ) {
     let internal_format =
@@ -198,8 +198,8 @@ impl<'obj> Texture2DBinding<'obj> {
     &self,
     level_of_detail: u32,
     format: TextureInputFormat,
-    offset: Vec2<u32>,
-    size: Vec2<u32>,
+    offset: Vec2u32,
+    size: Vec2u32,
     data: &[u8],
   ) {
     assert_eq!(data.len(), size.x as usize * size.y as usize * format.color_components() as usize);

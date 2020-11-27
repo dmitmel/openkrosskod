@@ -83,7 +83,7 @@ impl Renderer {
         None,
         vec2n(1),
         &[0xFF, 0xFF, 0xFF, 0xFF],
-      )
+      );
     }
 
     Ok(Self {
@@ -239,10 +239,10 @@ pub struct ShapeClipping {
 #[derive(Debug)]
 pub struct Font {
   pub texture: oogl::Texture2D,
-  pub texture_size: Vec2<u32>,
-  pub grid_size: Vec2<u32>,
-  pub grid_cell_size: Vec2<u32>,
-  pub character_size: Vec2<u32>,
+  pub texture_size: Vec2u32,
+  pub grid_size: Vec2u32,
+  pub grid_cell_size: Vec2u32,
+  pub character_size: Vec2u32,
 }
 
 impl Font {
@@ -340,7 +340,7 @@ pub fn load_texture_asset(
   globals: &Globals,
   path: &str,
   filter: oogl::TextureFilter,
-) -> AnyResult<(oogl::Texture2D, Vec2<u32>)> {
+) -> AnyResult<(oogl::Texture2D, Vec2u32)> {
   let file = globals.game_fs.open_file(&path)?;
 
   let mut texture = oogl::Texture2D::new(globals.share_gl());
@@ -360,7 +360,7 @@ pub fn load_texture_data_from_png<R: Read>(
   level_of_detail: u32,
   bound_texture: &oogl::Texture2DBinding<'_>,
   reader: R,
-) -> Result<Vec2<u32>, png::DecodingError> {
+) -> Result<Vec2u32, png::DecodingError> {
   let decoder = png::Decoder::new(reader);
   let (info, mut reader) = decoder.read_info()?;
   let mut buf = vec![0; info.buffer_size()];
