@@ -113,6 +113,7 @@ fn try_main() -> AnyResult<()> {
     )
     .resizable()
     .opengl()
+    .allow_highdpi()
     .build()
     .context("Failed to create the game window")?;
 
@@ -135,7 +136,7 @@ fn try_main() -> AnyResult<()> {
   gl.set_blending_equation(oogl::BlendingEquation::Add);
 
   let globals = Rc::new({
-    let window_size_i = Vec2::from(window.size());
+    let window_size_i = Vec2::from(window.drawable_size());
     Globals {
       gl,
       game_fs,
@@ -411,7 +412,8 @@ impl Game {
 
   pub fn process_input(&mut self) {
     let globals = unsafe { Rc::get_mut_unchecked(&mut self.globals) };
-    let main_window_id = self.window.id();
+    let main_window = &mut self.window;
+    let main_window_id = main_window.id();
 
     // This statement might seem weird at first, but it saves a us conditional
     // jump. It conveys the following logic:
@@ -448,12 +450,11 @@ impl Game {
           globals.window_is_focused = false;
         }
 
-        Event::Window { window_id, win_event: WindowEvent::SizeChanged(w, h), .. }
+        Event::Window { window_id, win_event: WindowEvent::SizeChanged(..), .. }
           if window_id == main_window_id =>
         {
-          assert!(w > 0);
-          assert!(h > 0);
-          globals.window_size_i = vec2(w as u32, h as u32);
+          let (w, h) = main_window.drawable_size();
+          globals.window_size_i = vec2(w, h);
           globals.window_size = vec2(w as f32, h as f32);
           globals.window_was_resized = true;
         }
