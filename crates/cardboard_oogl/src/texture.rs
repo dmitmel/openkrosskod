@@ -14,6 +14,11 @@ pub struct Texture2D<T: TextureDataType = u8> {
   ctx: SharedContext,
   addr: u32,
   internal_state_acquired: bool,
+
+  input_format: TextureInputFormat,
+  internal_format: TextureInternalFormat,
+  size: Cell<Vec2u32>,
+
   phantom: PhantomData<*mut T>,
 }
 
@@ -34,10 +39,64 @@ impl<T: TextureDataType> Object for Texture2D<T> {
 impl<T: TextureDataType> Texture2D<T> {
   pub const BIND_TARGET: BindTextureTarget = BindTextureTarget::Texture2D;
 
-  pub fn new(ctx: SharedContext) -> Self {
+  #[inline(always)]
+  pub fn input_format(&self) -> TextureInputFormat { self.input_format }
+  #[inline(always)]
+  pub fn internal_format(&self) -> TextureInternalFormat { self.internal_format }
+  #[inline(always)]
+  pub fn size(&self) -> Vec2u32 { self.size.get() }
+
+  pub fn new(
+    ctx: SharedContext,
+    input_format: TextureInputFormat,
+    internal_format_preference: Option<TextureInternalFormat>,
+  ) -> Self {
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenTextures(1, &mut addr) };
-    Self { ctx, addr, internal_state_acquired: false, phantom: PhantomData }
+
+    Self {
+      ctx,
+      addr,
+      internal_state_acquired: false,
+
+      input_format,
+      internal_format: internal_format_preference
+        .unwrap_or_else(|| input_format.ideal_internal_format()),
+      size: Cell::new(vec2n(0)),
+
+      phantom: PhantomData,
+    }
+  }
+
+  pub fn size_at_level_of_detail(&self, level_of_detail: u32) -> Vec2u32 {
+    let size = self.size();
+    // `a >> k` is equivalent to `a / 2**k`, max value with 1 is taken because
+    // the texture size can't be zero on any dimension
+    vec2((size.x >> level_of_detail).max(1), (size.y >> level_of_detail).max(1))
+  }
+
+  pub fn levels_of_detail_count(&self) -> u32 {
+    /// Essentially returns the value of `floor(log2(max(n, 1))) + 1` where `n`
+    /// is a positive integer. Explanation as for why this exact expression is
+    /// used:
+    ///
+    /// `floor(log2(m))` can be interpreted as the number of times `m` has to
+    /// be bitshifted to the right to get 1, in other words to get to the
+    /// minimum level of detail on this axis (see also
+    /// `size_at_level_of_detail`). A maximum value with 1 is taken because the
+    /// result of `0.leading_zeros()` is undefined, as are the logarithms of
+    /// non-positive numbers. This is however done as a sanity check because
+    /// the texture size can be zero only if it wasn't set with `set_size`
+    /// before (`set_size` doesn't allow zero sizes on any axis). Finally, we
+    /// add 1 to include the default level of detail, i.e. level 0.
+    fn lod_count_for_axis(n: u32) -> u32 {
+      // <https://users.rust-lang.org/t/logarithm-of-integers/8506/5>
+      // <https://github.com/rust-lang/rust/pull/70835/files#diff-8b5d068f3b1614f253a7bf9920ad9e8528eb6d623b57b69b09c90799cebaf9b1R4358>
+      (1u32.leading_zeros() - n.max(1).leading_zeros()) + 1
+    }
+
+    let size = self.size();
+    lod_count_for_axis(size.x).max(lod_count_for_axis(size.y))
   }
 
   pub fn bind(&'_ mut self, unit_preference: Option<u32>) -> Texture2DBinding<'_, T> {
@@ -97,6 +156,18 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
   #[inline(always)]
   pub fn unit(&self) -> u32 { self.unit }
 
+  #[inline(always)]
+  pub fn size(&self) -> Vec2u32 { self.texture.size() }
+
+  pub fn set_size(&self, size: Vec2u32) {
+    let max_size = self.ctx().capabilities().max_texture_size;
+    assert!(size.x > 0);
+    assert!(size.y > 0);
+    assert!(size.x <= max_size);
+    assert!(size.y <= max_size);
+    self.texture.size.set(size);
+  }
+
   pub fn generate_mipmap(&self) {
     unsafe { self.raw_gl().GenerateMipmap(Self::BIND_TARGET.as_raw()) };
   }
@@ -141,80 +212,49 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
     self.set_magnifying_filter(filter);
   }
 
-  pub fn set_data(
-    &self,
-    level_of_detail: u32,
-    format: TextureInputFormat,
-    internal_format_preference: Option<TextureInternalFormat>,
-    size: Vec2u32,
-    data: &[T],
-  ) {
-    let ctx = self.ctx();
-
-    let max_size = ctx.capabilities().max_texture_size;
-    assert!(size.x <= max_size);
-    assert!(size.y <= max_size);
-    assert_eq!(data.len(), size.x as usize * size.y as usize * format.color_components() as usize);
-
-    self.set_data_internal(
-      level_of_detail,
-      format,
-      internal_format_preference,
-      size,
-      data.as_ptr() as *const _,
+  pub fn reserve_and_set(&self, level_of_detail: u32, data: &[T]) {
+    let size = self.texture.size_at_level_of_detail(level_of_detail);
+    assert_eq!(
+      data.len(),
+      size.x as usize * size.y as usize * self.texture.input_format.color_components() as usize
     );
+
+    self.reserve_and_set_internal(level_of_detail, data.as_ptr());
   }
 
-  pub fn reserve_data(
-    &self,
-    level_of_detail: u32,
-    format: TextureInputFormat,
-    internal_format_preference: Option<TextureInternalFormat>,
-    size: Vec2u32,
-  ) {
-    let ctx = self.ctx();
-
-    let max_size = ctx.capabilities().max_texture_size;
-    assert!(size.x <= max_size);
-    assert!(size.y <= max_size);
-
-    self.set_data_internal(level_of_detail, format, internal_format_preference, size, ptr::null());
+  pub fn reserve(&self, level_of_detail: u32) {
+    self.reserve_and_set_internal(level_of_detail, ptr::null());
   }
 
-  fn set_data_internal(
-    &self,
-    level_of_detail: u32,
-    format: TextureInputFormat,
-    internal_format_preference: Option<TextureInternalFormat>,
-    size: Vec2u32,
-    data_ptr: *const c_void,
-  ) {
-    let internal_format =
-      internal_format_preference.unwrap_or_else(|| format.ideal_internal_format());
+  fn reserve_and_set_internal(&self, level_of_detail: u32, data_ptr: *const T) {
+    let size = self.texture.size_at_level_of_detail(level_of_detail);
     unsafe {
       self.ctx().raw_gl().TexImage2D(
         Self::BIND_TARGET.as_raw(),
         i32::try_from(level_of_detail).unwrap(),
-        internal_format.as_raw() as i32,
+        self.texture.internal_format.as_raw() as i32,
         i32::try_from(size.x).unwrap(),
         i32::try_from(size.y).unwrap(),
         0, // border, must be zero
-        format.as_raw(),
+        self.texture.input_format.as_raw(),
         T::GL_TEXTURE_INPUT_DATA_TYPE.as_raw(),
-        data_ptr,
+        data_ptr as *const c_void,
       );
     }
   }
 
-  pub fn set_sub_data(
-    &self,
-    level_of_detail: u32,
-    format: TextureInputFormat,
-    offset: Vec2u32,
-    size: Vec2u32,
-    data: &[T],
-  ) {
-    assert_eq!(data.len(), size.x as usize * size.y as usize * format.color_components() as usize);
+  pub fn set(&self, level_of_detail: u32, data: &[T]) {
+    self.set_slice(level_of_detail, vec2n(0), self.texture.size(), data);
+  }
+
+  pub fn set_slice(&self, level_of_detail: u32, offset: Vec2u32, size: Vec2u32, data: &[T]) {
+    assert_eq!(
+      data.len(),
+      size.x as usize * size.y as usize * self.texture.input_format.color_components() as usize
+    );
+
+    // TODO: Add check of the rectangle fromed by the offset and the size being
+    // contained inside the texture size, somehow ignore it in `set`.
 
     unsafe {
       self.ctx().raw_gl().TexSubImage2D(
@@ -224,7 +264,7 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
         i32::try_from(offset.y).unwrap(),
         i32::try_from(size.x).unwrap(),
         i32::try_from(size.y).unwrap(),
-        format.as_raw(),
+        self.texture.input_format.as_raw(),
         T::GL_TEXTURE_INPUT_DATA_TYPE.as_raw(),
         data.as_ptr() as *const _,
       );

@@ -311,6 +311,8 @@ macro_rules! impl_vec2 {
       pub fn signed_angle(self, rhs: Self) -> $ty { self.angle(rhs) * self.angle_sign(rhs) }
 
       #[inline]
+      pub fn rotated_from_x_axis(angle: $ty) -> Self { Self { x: angle.cos(), y: angle.sin() } }
+      #[inline]
       pub fn rotated(self, angle: $ty) -> Self {
         let s = angle.sin();
         let c = angle.cos();

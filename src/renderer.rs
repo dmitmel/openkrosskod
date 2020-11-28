@@ -71,19 +71,15 @@ impl Renderer {
       bound_vbo.set_data(&[[-1, -1], [-1, 1], [1, 1], [1, -1]], oogl::BufferUsageHint::StaticDraw);
     }
 
-    let mut white_texture = oogl::Texture2D::new(globals.share_gl());
+    let mut white_texture =
+      oogl::Texture2D::new(globals.share_gl(), oogl::TextureInputFormat::RGBA, None);
     {
       let bound_texture = white_texture.bind(None);
       bound_texture.object().set_debug_label(b"white_texture");
       bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
       bound_texture.set_filters(oogl::TextureFilter::Linear, None);
-      bound_texture.set_data(
-        0,
-        oogl::TextureInputFormat::RGBA,
-        None,
-        vec2n(1),
-        &[0xFF, 0xFF, 0xFF, 0xFF],
-      );
+      bound_texture.set_size(vec2n(1));
+      bound_texture.reserve_and_set(0, &[0xFF, 0xFF, 0xFF, 0xFF]);
     }
 
     Ok(Self {
@@ -149,7 +145,7 @@ impl Renderer {
   pub fn draw_text(&mut self, font: &mut Font, pos: Vec2f, text_block: &mut TextBlock<'_>) {
     let font_char_grid_size_f = Vec2f::cast_from(font.grid_cell_size);
     let font_char_size_f = Vec2f::cast_from(font.character_size);
-    let font_texture_size_f = Vec2f::cast_from(font.texture_size);
+    let font_texture_size_f = Vec2f::cast_from(font.texture.size());
     let char_size = font_char_size_f * text_block.scale;
     let (text_block_size, char_spacing) = font.measure_size(text_block);
 
@@ -239,7 +235,6 @@ pub struct ShapeClipping {
 #[derive(Debug)]
 pub struct Font {
   pub texture: oogl::Texture2D,
-  pub texture_size: Vec2u32,
   pub grid_size: Vec2u32,
   pub grid_cell_size: Vec2u32,
   pub character_size: Vec2u32,
@@ -340,27 +335,23 @@ pub fn load_texture_asset(
   globals: &Globals,
   path: &str,
   filter: oogl::TextureFilter,
-) -> AnyResult<(oogl::Texture2D, Vec2u32)> {
+) -> AnyResult<oogl::Texture2D> {
   let file = globals.game_fs.open_file(&path)?;
 
-  let mut texture = oogl::Texture2D::new(globals.share_gl());
-
+  let mut texture = load_texture_data_from_png(globals.share_gl(), path.as_bytes(), file)
+    .with_context(|| format!("Failed to decode '{}'", path))?;
   let bound_texture = texture.bind(None);
-  bound_texture.object().set_debug_label(path.as_bytes());
   bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
   bound_texture.set_filters(filter, None);
 
-  let texture_size = load_texture_data_from_png(0, &bound_texture, file)
-    .with_context(|| format!("Failed to decode '{}'", path))?;
-
-  Ok((texture, texture_size))
+  Ok(texture)
 }
 
 pub fn load_texture_data_from_png<R: Read>(
-  level_of_detail: u32,
-  bound_texture: &oogl::Texture2DBinding<'_>,
+  gl: oogl::SharedContext,
+  debug_label: &[u8],
   reader: R,
-) -> Result<Vec2u32, png::DecodingError> {
+) -> Result<oogl::Texture2D, png::DecodingError> {
   let decoder = png::Decoder::new(reader);
   let (info, mut reader) = decoder.read_info()?;
   let mut buf = vec![0; info.buffer_size()];
@@ -382,7 +373,11 @@ pub fn load_texture_data_from_png<R: Read>(
     _ => unimplemented!("Unsupported texture color type: {:?}", info.color_type),
   };
 
-  bound_texture.set_data(level_of_detail, gl_format, None, vec2(info.width, info.height), &buf);
+  let mut texture = oogl::Texture2D::new(gl, gl_format, None);
+  let bound_texture = texture.bind(None);
+  bound_texture.object().set_debug_label(debug_label);
+  bound_texture.set_size(vec2(info.width, info.height));
+  bound_texture.reserve_and_set(0, &buf);
 
-  Ok(vec2(info.width, info.height))
+  Ok(texture)
 }

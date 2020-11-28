@@ -159,10 +159,8 @@ fn try_main() -> AnyResult<()> {
     }
   });
 
-  let (ball_texture, _ball_texture_size) =
-    load_texture_asset(&globals, "ball.png", oogl::TextureFilter::Linear)?;
-  let (font_texture, font_texture_size) =
-    load_texture_asset(&globals, "font.png", oogl::TextureFilter::Nearest)?;
+  let ball_texture = load_texture_asset(&globals, "ball.png", oogl::TextureFilter::Linear)?;
+  let font_texture = load_texture_asset(&globals, "font.png", oogl::TextureFilter::Nearest)?;
 
   let renderer =
     Renderer::init(Rc::clone(&globals)).context("Failed to initialize the renderer")?;
@@ -197,7 +195,6 @@ fn try_main() -> AnyResult<()> {
     ball_texture,
     font: Font {
       texture: font_texture,
-      texture_size: font_texture_size,
       grid_size: vec2(16, 8),
       grid_cell_size: FONT_CHAR_GRID_SIZE,
       character_size: FONT_CHAR_SIZE,

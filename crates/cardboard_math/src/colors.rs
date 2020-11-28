@@ -30,5 +30,6 @@ pub fn colorn<T: Copy>(n: T, a: T) -> Color<T> { Color { r: n, g: n, b: n, a } }
 pub const fn colorn<T: Copy>(n: T, a: T) -> Color<T> { Color { r: n, g: n, b: n, a } }
 
 impl<T> Color<T> {
+  #[inline]
   pub fn with_alpha(self, a: T) -> Self { Self { r: self.r, g: self.g, b: self.b, a } }
 }

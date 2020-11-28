@@ -1,6 +1,8 @@
 use crate::impl_prelude::*;
 use prelude_plus::*;
 
+// TODO: implement size handling system similar to that of Texture2D
+
 gl_enum!({
   pub enum BindBufferTarget {
     Vertex = ARRAY_BUFFER,
