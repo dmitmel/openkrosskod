@@ -150,17 +150,17 @@ impl<'obj, T> VertexBufferBinding<'obj, T> {
 }
 
 #[derive(Debug)]
-pub struct ElementBuffer<T: ElementBufferType> {
+pub struct ElementBuffer<T: BufferIndex> {
   ctx: SharedContext,
   addr: u32,
   internal_state_acquired: bool,
   phantom: PhantomData<*mut T>,
 }
 
-impl<T: ElementBufferType> !Send for ElementBuffer<T> {}
-impl<T: ElementBufferType> !Sync for ElementBuffer<T> {}
+impl<T: BufferIndex> !Send for ElementBuffer<T> {}
+impl<T: BufferIndex> !Sync for ElementBuffer<T> {}
 
-impl<T: ElementBufferType> Object for ElementBuffer<T> {
+impl<T: BufferIndex> Object for ElementBuffer<T> {
   const DEBUG_TYPE_IDENTIFIER: u32 = gl::BUFFER;
 
   #[inline(always)]
@@ -171,7 +171,7 @@ impl<T: ElementBufferType> Object for ElementBuffer<T> {
   fn internal_state_acquired(&self) -> bool { self.internal_state_acquired }
 }
 
-impl<T: ElementBufferType> ElementBuffer<T> {
+impl<T: BufferIndex> ElementBuffer<T> {
   pub const BIND_TARGET: BindBufferTarget = BindBufferTarget::Element;
 
   pub fn new(ctx: SharedContext) -> Self {
@@ -190,18 +190,18 @@ impl<T: ElementBufferType> ElementBuffer<T> {
   }
 }
 
-impl<T: ElementBufferType> Drop for ElementBuffer<T> {
+impl<T: BufferIndex> Drop for ElementBuffer<T> {
   fn drop(&mut self) { unsafe { self.raw_gl().DeleteBuffers(1, &self.addr) }; }
 }
 
 #[derive(Debug)]
-pub struct ElementBufferBinding<'obj, T: ElementBufferType> {
+pub struct ElementBufferBinding<'obj, T: BufferIndex> {
   buffer: &'obj mut ElementBuffer<T>,
 }
 
 impl<'obj, T> ObjectBinding<'obj, ElementBuffer<T>> for ElementBufferBinding<'obj, T>
 where
-  T: ElementBufferType,
+  T: BufferIndex,
 {
   #[inline(always)]
   fn object(&self) -> &ElementBuffer<T> { &self.buffer }
@@ -211,7 +211,7 @@ where
   }
 }
 
-impl<'obj, T: ElementBufferType> ElementBufferBinding<'obj, T> {
+impl<'obj, T: BufferIndex> ElementBufferBinding<'obj, T> {
   const BIND_TARGET: BindBufferTarget = ElementBuffer::<u8>::BIND_TARGET;
 
   pub fn set_data(&self, data: &[T], usage_hint: BufferUsageHint) {
@@ -257,15 +257,15 @@ gl_enum!({
   }
 });
 
-pub trait ElementBufferType {
+pub trait BufferIndex {
   const GL_DRAW_ELEMENTS_DATA_TYPE: DrawElementsDataType;
 }
 
-impl ElementBufferType for u8 {
+impl BufferIndex for u8 {
   const GL_DRAW_ELEMENTS_DATA_TYPE: DrawElementsDataType = DrawElementsDataType::U8;
 }
 
-impl ElementBufferType for u16 {
+impl BufferIndex for u16 {
   const GL_DRAW_ELEMENTS_DATA_TYPE: DrawElementsDataType = DrawElementsDataType::U16;
 }
 

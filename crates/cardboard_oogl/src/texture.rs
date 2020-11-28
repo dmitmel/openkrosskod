@@ -10,16 +10,17 @@ gl_enum!({
 });
 
 #[derive(Debug)]
-pub struct Texture2D {
+pub struct Texture2D<T: TextureDataType = u8> {
   ctx: SharedContext,
   addr: u32,
   internal_state_acquired: bool,
+  phantom: PhantomData<*mut T>,
 }
 
-impl !Send for Texture2D {}
-impl !Sync for Texture2D {}
+impl<T: TextureDataType> !Send for Texture2D<T> {}
+impl<T: TextureDataType> !Sync for Texture2D<T> {}
 
-impl Object for Texture2D {
+impl<T: TextureDataType> Object for Texture2D<T> {
   const DEBUG_TYPE_IDENTIFIER: u32 = gl::TEXTURE;
 
   #[inline(always)]
@@ -30,16 +31,16 @@ impl Object for Texture2D {
   fn internal_state_acquired(&self) -> bool { self.internal_state_acquired }
 }
 
-impl Texture2D {
+impl<T: TextureDataType> Texture2D<T> {
   pub const BIND_TARGET: BindTextureTarget = BindTextureTarget::Texture2D;
 
   pub fn new(ctx: SharedContext) -> Self {
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenTextures(1, &mut addr) };
-    Self { ctx, addr, internal_state_acquired: false }
+    Self { ctx, addr, internal_state_acquired: false, phantom: PhantomData }
   }
 
-  pub fn bind(&'_ mut self, unit_preference: Option<u32>) -> Texture2DBinding<'_> {
+  pub fn bind(&'_ mut self, unit_preference: Option<u32>) -> Texture2DBinding<'_, T> {
     #[allow(clippy::or_fun_call)]
     let unit = unit_preference.unwrap_or(self.ctx.active_texture_unit.get());
     assert!(unit < self.ctx.capabilities().max_texture_units);
@@ -62,25 +63,36 @@ impl Texture2D {
   }
 }
 
-impl Drop for Texture2D {
+impl<T: TextureDataType> Drop for Texture2D<T> {
   fn drop(&mut self) { unsafe { self.ctx.raw_gl().DeleteTextures(1, &self.addr) }; }
 }
 
+pub trait TextureDataType {
+  const GL_TEXTURE_INPUT_DATA_TYPE: TextureInputDataType;
+}
+
+impl TextureDataType for u8 {
+  const GL_TEXTURE_INPUT_DATA_TYPE: TextureInputDataType = TextureInputDataType::U8;
+}
+
 #[derive(Debug)]
-pub struct Texture2DBinding<'obj> {
-  texture: &'obj mut Texture2D,
+pub struct Texture2DBinding<'obj, T: TextureDataType = u8> {
+  texture: &'obj mut Texture2D<T>,
   unit: u32,
 }
 
-impl<'obj> ObjectBinding<'obj, Texture2D> for Texture2DBinding<'obj> {
+impl<'obj, T> ObjectBinding<'obj, Texture2D<T>> for Texture2DBinding<'obj, T>
+where
+  T: TextureDataType,
+{
   #[inline(always)]
-  fn object(&self) -> &Texture2D { &self.texture }
+  fn object(&self) -> &Texture2D<T> { &self.texture }
 
   fn unbind_completely(self) { self.ctx().bound_texture_2d.unbind_unconditionally(self.raw_gl()); }
 }
 
-impl<'obj> Texture2DBinding<'obj> {
-  pub const BIND_TARGET: BindTextureTarget = Texture2D::BIND_TARGET;
+impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
+  pub const BIND_TARGET: BindTextureTarget = Texture2D::<T>::BIND_TARGET;
 
   #[inline(always)]
   pub fn unit(&self) -> u32 { self.unit }
@@ -135,7 +147,7 @@ impl<'obj> Texture2DBinding<'obj> {
     format: TextureInputFormat,
     internal_format_preference: Option<TextureInternalFormat>,
     size: Vec2u32,
-    data: &[u8],
+    data: &[T],
   ) {
     let ctx = self.ctx();
 
@@ -188,7 +200,7 @@ impl<'obj> Texture2DBinding<'obj> {
         i32::try_from(size.y).unwrap(),
         0, // border, must be zero
         format.as_raw(),
-        TextureInputDataType::U8.as_raw(),
+        T::GL_TEXTURE_INPUT_DATA_TYPE.as_raw(),
         data_ptr,
       );
     }
@@ -200,7 +212,7 @@ impl<'obj> Texture2DBinding<'obj> {
     format: TextureInputFormat,
     offset: Vec2u32,
     size: Vec2u32,
-    data: &[u8],
+    data: &[T],
   ) {
     assert_eq!(data.len(), size.x as usize * size.y as usize * format.color_components() as usize);
 
@@ -213,7 +225,7 @@ impl<'obj> Texture2DBinding<'obj> {
         i32::try_from(size.x).unwrap(),
         i32::try_from(size.y).unwrap(),
         format.as_raw(),
-        TextureInputDataType::U8.as_raw(),
+        T::GL_TEXTURE_INPUT_DATA_TYPE.as_raw(),
         data.as_ptr() as *const _,
       );
     }

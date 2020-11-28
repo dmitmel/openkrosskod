@@ -283,13 +283,14 @@ impl<T> Uniform<T> {
 }
 
 macro_rules! impl_set_uniform {
-  ($data_type:ty, $arg_pattern:pat, $gl_uniform_func_name:ident($($gl_uniform_func_arg:expr),+)) => {
+  (
+    $data_type:ty, $arg_pattern:pat, $gl_uniform_func_name:ident($($gl_uniform_func_arg:expr),+)
+  ) => {
     impl Uniform<$data_type> {
       pub fn set(&self, program_binding: &ProgramBinding<'_>, $arg_pattern: $data_type) {
         let program = &program_binding.program;
-        let gl = program.raw_gl();
         assert_eq!(self.program_addr, program.addr);
-        unsafe { gl.$gl_uniform_func_name(self.location, $($gl_uniform_func_arg),+) };
+        unsafe { program.raw_gl().$gl_uniform_func_name(self.location, $($gl_uniform_func_arg),+) };
       }
     }
   };
@@ -305,7 +306,15 @@ impl_set_uniform!(Vec2<f32>, Vec2 { x, y }, Uniform2f(x, y));
 impl_set_uniform!(Vec2<i32>, Vec2 { x, y }, Uniform2i(x, y));
 impl_set_uniform!(Vec2<u32>, Vec2 { x, y }, Uniform2i(x as i32, y as i32));
 impl_set_uniform!(Color<f32>, Color { r, g, b, a }, Uniform4f(r, g, b, a));
-impl_set_uniform!(crate::Texture2DBinding<'_>, tex, Uniform1i(tex.unit() as i32));
+
+impl<T: crate::TextureDataType> Uniform<crate::Texture2DBinding<'_, T>> {
+  #[inline(always)]
+  pub fn set(&self, program_binding: &ProgramBinding<'_>, tex: crate::Texture2DBinding<'_, T>) {
+    let program = &program_binding.program;
+    assert_eq!(self.program_addr, program.addr);
+    unsafe { program.raw_gl().Uniform1i(self.location, tex.unit() as i32) };
+  }
+}
 
 gl_enum!({
   pub enum UniformType {
