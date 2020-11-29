@@ -165,6 +165,8 @@ fn try_main() -> AnyResult<()> {
   let renderer =
     Renderer::init(Rc::clone(&globals)).context("Failed to initialize the renderer")?;
 
+  globals.gl.release_shader_compiler();
+
   let state = {
     let (mut left_racket, mut right_racket) = (Racket::new(1, -1.0), Racket::new(2, 1.0));
     left_racket.update_pos(&globals);

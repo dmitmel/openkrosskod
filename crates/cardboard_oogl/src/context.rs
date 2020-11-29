@@ -94,6 +94,8 @@ impl Context {
   pub fn set_blending_color(&self, color: Colorf) {
     unsafe { self.raw_gl.BlendColor(color.r, color.g, color.b, color.a) };
   }
+
+  pub fn release_shader_compiler(&self) { unsafe { self.raw_gl.ReleaseShaderCompiler() }; }
 }
 
 // TODO: Implement Debug properly with wrappers for non-debuggable stuff
