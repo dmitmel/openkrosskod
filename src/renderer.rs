@@ -56,8 +56,8 @@ impl Renderer {
       globals.share_gl(),
       // this attribute pointer will be the same for both programs because both
       // use the same vertex shader, as such the VBO can be shared
-      vec![rectangle_program_reflection.a_pos.to_pointer(oogl::AttributePtrConfig {
-        type_: oogl::AttributePtrDataType::I8,
+      vec![rectangle_program_reflection.a_pos.to_pointer(oogl::AttributePtrType {
+        name: oogl::AttributePtrTypeName::I8,
         len: 2,
         normalize: false,
       })],

@@ -1,4 +1,5 @@
 use crate::impl_prelude::*;
+use crate::CorrespondingAttributePtrType;
 use cardboard_math::*;
 use prelude_plus::*;
 
@@ -157,8 +158,8 @@ impl Program {
     // monomorphization
     let location = self.get_uniform_location(name);
     let data_type = self.get_uniform_type(location);
-    if let Some((actual_type_name, _)) = data_type {
-      assert!(T::CORRESPONDING_UNIFORM_TYPE.is_assignable_to(actual_type_name));
+    if let Some(data_type) = &data_type {
+      assert!(T::CORRESPONDING_UNIFORM_TYPE.is_assignable_to(data_type.name));
     }
     Uniform { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
@@ -194,11 +195,11 @@ impl Program {
       todo!("array uniforms");
     }
 
-    Some((
-      UniformTypeName::from_raw(data_type)
+    Some(UniformType {
+      name: UniformTypeName::from_raw(data_type)
         .unwrap_or_else(|| panic!("Unknown uniform data type: 0x{:x}", data_type)),
-      data_array_len as u32,
-    ))
+      len: data_array_len as u32,
+    })
   }
 
   pub fn get_attribute_location(&self, name: &[u8]) -> u32 {
@@ -207,7 +208,7 @@ impl Program {
     unsafe { gl.GetAttribLocation(self.addr, c_name.as_ptr()) as u32 }
   }
 
-  pub fn get_attribute_type(&self, location: u32) -> Option<(AttributeType, u32)> {
+  pub fn get_attribute_type(&self, location: u32) -> Option<AttributeType> {
     if location == INACTIVE_ATTRIBUTE_LOCATION {
       return None;
     }
@@ -232,14 +233,14 @@ impl Program {
       todo!("array attributes");
     }
 
-    Some((
-      AttributeType::from_raw(data_type)
+    Some(AttributeType {
+      name: AttributeTypeName::from_raw(data_type)
         .unwrap_or_else(|| panic!("Unknown attribute data type: 0x{:x}", data_type)),
-      data_array_len as u32,
-    ))
+      len: data_array_len as u32,
+    })
   }
 
-  pub fn get_attribute<T>(&self, name: &[u8]) -> Attribute<T> {
+  pub fn get_attribute<T: CorrespondingAttributePtrType>(&self, name: &[u8]) -> Attribute<T> {
     let location = self.get_attribute_location(name);
     // TODO: See get_uniform
     let data_type = self.get_attribute_type(location);
@@ -264,7 +265,7 @@ impl<'obj> ObjectBinding<'obj, Program> for ProgramBinding<'obj> {
 }
 
 #[derive(Debug)]
-pub struct Uniform<T: ?Sized> {
+pub struct Uniform<T: CorrespondingUniformType> {
   location: i32,
   program_addr: u32,
   data_type: Option<UniformType>,
@@ -274,7 +275,7 @@ pub struct Uniform<T: ?Sized> {
 impl<T> !Send for Uniform<T> {}
 impl<T> !Sync for Uniform<T> {}
 
-impl<T> Uniform<T> {
+impl<T: CorrespondingUniformType> Uniform<T> {
   #[inline(always)]
   pub fn location(&self) -> i32 { self.location }
   #[inline(always)]
@@ -282,7 +283,7 @@ impl<T> Uniform<T> {
   #[inline(always)]
   pub fn program_addr(&self) -> u32 { self.program_addr }
   #[inline(always)]
-  pub fn data_type(&self) -> Option<UniformType> { self.data_type }
+  pub fn data_type(&self) -> &Option<UniformType> { &self.data_type }
 
   #[inline(always)]
   pub fn reflect_from(program: &Program, name: &[u8]) -> Self
@@ -329,7 +330,12 @@ impl_set_uniform!(Vec2<u32>, IVec2, |Vec2 { x, y }| Uniform2i(x as i32, y as i32
 impl_set_uniform!(Vec2<bool>, BVec2, |Vec2 { x, y }| Uniform2i(x as i32, y as i32));
 impl_set_uniform!(Color<f32>, Vec4, |Color { r, g, b, a }| Uniform4f(r, g, b, a));
 
-type UniformType = (UniformTypeName, u32);
+// TODO: Derive more relevant traits on this struct and others.
+#[derive(Debug)]
+pub struct UniformType {
+  pub name: UniformTypeName,
+  pub len: u32,
+}
 
 gl_enum!({
   pub enum UniformTypeName {
@@ -382,17 +388,17 @@ pub trait CorrespondingUniformType {
 }
 
 #[derive(Debug)]
-pub struct Attribute<T> {
+pub struct Attribute<T: CorrespondingAttributePtrType> {
   location: u32,
   program_addr: u32,
-  data_type: Option<(AttributeType, u32)>,
+  data_type: Option<AttributeType>,
   phantom: PhantomData<*mut T>,
 }
 
 impl<T> !Send for Attribute<T> {}
 impl<T> !Sync for Attribute<T> {}
 
-impl<T> Attribute<T> {
+impl<T: CorrespondingAttributePtrType> Attribute<T> {
   #[inline(always)]
   pub fn location(&self) -> u32 { self.location }
   #[inline(always)]
@@ -400,21 +406,20 @@ impl<T> Attribute<T> {
   #[inline(always)]
   pub fn program_addr(&self) -> u32 { self.program_addr }
   #[inline(always)]
-  pub fn data_type(&self) -> &Option<(AttributeType, u32)> { &self.data_type }
+  pub fn data_type(&self) -> &Option<AttributeType> { &self.data_type }
 
   #[inline(always)]
   pub fn reflect_from(program: &Program, name: &[u8]) -> Self { program.get_attribute(name) }
+}
 
-  pub fn to_pointer(&self, config: crate::AttributePtrConfig) -> crate::AttributePtr {
-    if let Some((data_type, data_array_len)) = self.data_type {
-      assert_eq!(config.len as u32, data_type.components() as u32 * data_array_len);
-    }
-    crate::AttributePtr::new(self.location, config)
-  }
+#[derive(Debug, Eq, PartialEq)]
+pub struct AttributeType {
+  pub name: AttributeTypeName,
+  pub len: u32,
 }
 
 gl_enum!({
-  pub enum AttributeType {
+  pub enum AttributeTypeName {
     Float = FLOAT,
     Vec2 = FLOAT_VEC2,
     Vec3 = FLOAT_VEC3,
@@ -425,13 +430,16 @@ gl_enum!({
   }
 });
 
-impl AttributeType {
+impl AttributeTypeName {
   pub fn components(&self) -> u8 {
     match self {
       Self::Float => 1,
       Self::Vec2 => 2,
       Self::Vec3 => 3,
       Self::Vec4 => 4,
+      // Self::Mat2 => 2 * 2,
+      // Self::Mat3 => 3 * 3,
+      // Self::Mat4 => 4 * 4,
     }
   }
 }

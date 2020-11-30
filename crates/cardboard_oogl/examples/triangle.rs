@@ -68,18 +68,7 @@ fn main() {
 
   let mut vbo = VertexBuffer::<Vertex>::new(
     Rc::clone(&gl),
-    vec![
-      attr_pos.to_pointer(AttributePtrConfig {
-        type_: AttributePtrDataType::F32,
-        len: 2,
-        normalize: false,
-      }),
-      attr_color.to_pointer(AttributePtrConfig {
-        type_: AttributePtrDataType::F32,
-        len: 4,
-        normalize: false,
-      }),
-    ],
+    vec![attr_pos.to_pointer_simple(), attr_color.to_pointer_simple()],
   );
 
   let bound_vbo = vbo.bind();

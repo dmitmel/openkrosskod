@@ -1,4 +1,5 @@
 use crate::impl_prelude::*;
+use cardboard_math::*;
 use prelude_plus::*;
 
 // TODO: implement size handling system similar to that of Texture2D
@@ -46,7 +47,7 @@ impl<T> VertexBuffer<T> {
   pub fn new(ctx: SharedContext, attributes: Vec<AttributePtr>) -> Self {
     let mut stride = 0;
     for attrib in &attributes {
-      assert!(1 <= attrib.config.len && attrib.config.len <= 4);
+      assert!(1 <= attrib.type_.len && attrib.type_.len <= 4);
       stride += attrib.size as u32;
     }
     assert!(stride <= i32::MAX as u32); // for quick conversion to GLsizei
@@ -108,9 +109,9 @@ impl<'obj, T> VertexBufferBinding<'obj, T> {
         unsafe {
           gl.VertexAttribPointer(
             attrib.location as u32,
-            attrib.config.len as i32,
-            attrib.config.type_.as_raw(),
-            attrib.config.normalize as u8,
+            attrib.type_.len as i32,
+            attrib.type_.name.as_raw(),
+            attrib.type_.normalize as u8,
             stride as i32,
             offset as *const c_void,
           )
@@ -226,19 +227,19 @@ gl_enum!({
 });
 
 pub trait BufferIndex {
-  const GL_DRAW_ELEMENTS_DATA_TYPE: DrawElementsDataType;
+  const GL_DRAW_ELEMENTS_TYPE: DrawElementsType;
 }
 
 impl BufferIndex for u8 {
-  const GL_DRAW_ELEMENTS_DATA_TYPE: DrawElementsDataType = DrawElementsDataType::U8;
+  const GL_DRAW_ELEMENTS_TYPE: DrawElementsType = DrawElementsType::U8;
 }
 
 impl BufferIndex for u16 {
-  const GL_DRAW_ELEMENTS_DATA_TYPE: DrawElementsDataType = DrawElementsDataType::U16;
+  const GL_DRAW_ELEMENTS_TYPE: DrawElementsType = DrawElementsType::U16;
 }
 
 gl_enum!({
-  pub enum DrawElementsDataType {
+  pub enum DrawElementsType {
     U8 = UNSIGNED_BYTE,
     U16 = UNSIGNED_SHORT,
   }
@@ -377,24 +378,24 @@ where
     self.raw_gl().DrawElements(
       mode.as_raw(),
       i32::try_from(count).unwrap(),
-      T::GL_DRAW_ELEMENTS_DATA_TYPE.as_raw(),
+      T::GL_DRAW_ELEMENTS_TYPE.as_raw(),
       (start as usize * mem::size_of::<T>()) as *const c_void,
     )
   }
 }
 
 #[derive(Debug)]
-pub struct AttributePtrConfig {
-  pub type_: AttributePtrDataType,
-  pub len: u16,
+pub struct AttributePtrType {
+  pub name: AttributePtrTypeName,
+  pub len: u32,
   pub normalize: bool,
 }
 
 #[derive(Debug)]
 pub struct AttributePtr {
   location: u32,
-  config: AttributePtrConfig,
-  size: u16,
+  type_: AttributePtrType,
+  size: u32,
 }
 
 impl AttributePtr {
@@ -403,19 +404,32 @@ impl AttributePtr {
   #[inline(always)]
   pub fn is_active(&self) -> bool { self.location != crate::INACTIVE_ATTRIBUTE_LOCATION }
   #[inline(always)]
-  pub fn config(&self) -> &AttributePtrConfig { &self.config }
+  pub fn type_(&self) -> &AttributePtrType { &self.type_ }
   #[inline(always)]
-  pub fn size(&self) -> u16 { self.size }
+  pub fn size(&self) -> u32 { self.size }
 
-  pub fn new(location: u32, config: AttributePtrConfig) -> Self {
-    assert!(config.len > 0);
-    let size = config.type_.size() as u16 * config.len;
-    Self { location, config, size }
+  pub fn new(location: u32, type_: AttributePtrType) -> Self {
+    assert!(type_.len > 0);
+    let size = type_.name.size() as u32 * type_.len;
+    Self { location, type_, size }
+  }
+}
+
+impl<T: CorrespondingAttributePtrType> crate::Attribute<T> {
+  pub fn to_pointer(&self, type_: AttributePtrType) -> AttributePtr {
+    if let Some(data_type) = &self.data_type() {
+      assert_eq!(type_.len as u32, data_type.name.components() as u32 * data_type.len);
+    }
+    AttributePtr::new(self.location(), type_)
+  }
+
+  pub fn to_pointer_simple(&self) -> AttributePtr {
+    self.to_pointer(T::CORRESPONDING_ATTRIBUTE_PTR_TYPE)
   }
 }
 
 gl_enum!({
-  pub enum AttributePtrDataType {
+  pub enum AttributePtrTypeName {
     I8 = BYTE,
     U8 = UNSIGNED_BYTE,
     I16 = SHORT,
@@ -425,7 +439,7 @@ gl_enum!({
   }
 });
 
-impl AttributePtrDataType {
+impl AttributePtrTypeName {
   pub fn size(&self) -> u8 {
     use mem::size_of;
     let size: usize = match self {
@@ -440,3 +454,23 @@ impl AttributePtrDataType {
     size as u8
   }
 }
+
+pub trait CorrespondingAttributePtrType {
+  const CORRESPONDING_ATTRIBUTE_PTR_TYPE: AttributePtrType;
+}
+
+macro_rules! impl_attr_type {
+  ($data_type:ty, ($corresponding_type_name:ident, $corresponding_type_len:literal)) => {
+    impl CorrespondingAttributePtrType for $data_type {
+      const CORRESPONDING_ATTRIBUTE_PTR_TYPE: AttributePtrType = AttributePtrType {
+        name: AttributePtrTypeName::$corresponding_type_name,
+        len: $corresponding_type_len,
+        normalize: false,
+      };
+    }
+  };
+}
+
+impl_attr_type!(f32, (F32, 1));
+impl_attr_type!(Vec2<f32>, (F32, 2));
+impl_attr_type!(Color<f32>, (F32, 4));
