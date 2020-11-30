@@ -12,7 +12,7 @@ macro_rules! gl_enum {
     }
   ) => {
     #[repr(u32)]
-    #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
     $(#[$enum_meta])*
     $visibility enum $enum_name {
       $($(#[$variant_meta])* $rust_variant = ::gl::$gl_variant,)+

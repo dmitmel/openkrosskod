@@ -384,14 +384,14 @@ where
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct AttributePtrType {
   pub name: AttributePtrTypeName,
   pub len: u32,
   pub normalize: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct AttributePtr {
   location: u32,
   type_: AttributePtrType,

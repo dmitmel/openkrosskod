@@ -330,8 +330,7 @@ impl_set_uniform!(Vec2<u32>, IVec2, |Vec2 { x, y }| Uniform2i(x as i32, y as i32
 impl_set_uniform!(Vec2<bool>, BVec2, |Vec2 { x, y }| Uniform2i(x as i32, y as i32));
 impl_set_uniform!(Color<f32>, Vec4, |Color { r, g, b, a }| Uniform4f(r, g, b, a));
 
-// TODO: Derive more relevant traits on this struct and others.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct UniformType {
   pub name: UniformTypeName,
   pub len: u32,
@@ -412,7 +411,7 @@ impl<T: CorrespondingAttributePtrType> Attribute<T> {
   pub fn reflect_from(program: &Program, name: &[u8]) -> Self { program.get_attribute(name) }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct AttributeType {
   pub name: AttributeTypeName,
   pub len: u32,

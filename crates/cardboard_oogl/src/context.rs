@@ -124,6 +124,7 @@ impl<T> BindingTarget<T> {
 
 macro_rules! impl_binding_target_state {
   ($target_enum:ident, $gl_bind_fn:ident ($($target:ident)?)) => {
+    #[derive(Debug)]
     pub(crate) enum $target_enum {}
 
     #[allow(dead_code)]
@@ -163,7 +164,7 @@ impl_binding_target_state!(FramebufferBindingTarget, BindFramebuffer(target));
 //   pub fn new() -> Self { Self { phantom: PhantomData } }
 // }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
 pub struct ContextCapabilities {
   pub renderer: String,
   pub vendor: String,
@@ -264,7 +265,7 @@ impl ContextCapabilities {
 
 macro_rules! generate_context_extensions_struct {
   ($(($name:literal, $field:ident)),* $(,)?) => {
-    #[derive(Debug)]
+    #[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
     pub struct ContextExtensions {
       $(pub $field: bool),*
     }
