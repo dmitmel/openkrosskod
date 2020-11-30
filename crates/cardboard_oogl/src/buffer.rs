@@ -266,16 +266,16 @@ impl<T: BufferIndex> Buffer<T> for ElementBuffer<T> {
   unsafe fn __impl_set_len(&self, len: usize) { self.len.set(len) }
 }
 
-pub trait BufferBinding<'obj, Buf: 'obj, T>: ObjectBinding<'obj, Buf>
+pub trait BufferBinding<'obj, Obj: 'obj, T>: ObjectBinding<'obj, Obj>
 where
-  Buf: Buffer<T>,
+  Obj: Buffer<T>,
 {
   const BIND_TARGET: BindBufferTarget;
 
   #[inline(always)]
   fn len(&'obj self) -> usize { self.object().len() }
   #[inline(always)]
-  fn is_empty(&'obj self) -> usize { self.object().len() }
+  fn is_empty(&'obj self) -> bool { self.object().is_empty() }
 
   fn reserve_and_set(&'obj self, usage_hint: BufferUsageHint, data: &[T]) {
     unsafe { self.__impl_buffer_data(data.len(), data.as_ptr(), usage_hint) };
@@ -336,9 +336,9 @@ where
   const BIND_TARGET: BindBufferTarget = BindBufferTarget::Element;
 }
 
-pub trait DrawableBufferBinding<'obj, Buf: 'obj, T>: BufferBinding<'obj, Buf, T>
+pub trait DrawableBufferBinding<'obj, Obj: 'obj, T>: BufferBinding<'obj, Obj, T>
 where
-  Buf: Buffer<T>,
+  Obj: Buffer<T>,
 {
   fn draw(&'obj self, _program_binding: &crate::ProgramBinding, mode: DrawPrimitive) {
     unsafe { self.__impl_draw(mode, 0, self.len()) }

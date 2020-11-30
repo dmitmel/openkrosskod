@@ -43,8 +43,6 @@ impl<T: TextureDataType> Texture2D<T> {
   pub fn input_format(&self) -> TextureInputFormat { self.input_format }
   #[inline(always)]
   pub fn internal_format(&self) -> TextureInternalFormat { self.internal_format }
-  #[inline(always)]
-  pub fn size(&self) -> Vec2u32 { self.size.get() }
 
   pub fn new(
     ctx: SharedContext,
@@ -348,3 +346,30 @@ gl_enum!({
     U16_5_5_5_1 = UNSIGNED_SHORT_5_5_5_1,
   }
 });
+
+pub trait Texture<T: TextureDataType = u8>: Object {
+  fn size(&self) -> Vec2u32;
+  #[inline(always)]
+  fn is_empty(&self) -> bool {
+    let s = self.size();
+    s.x == 0 || s.y == 0
+  }
+}
+
+impl<T: TextureDataType> Texture<T> for Texture2D<T> {
+  #[inline(always)]
+  fn size(&self) -> Vec2u32 { self.size.get() }
+}
+
+pub trait TextureBinding<'obj, Obj: 'obj, T>: ObjectBinding<'obj, Obj>
+where
+  Obj: Texture<T>,
+  T: TextureDataType,
+{
+  const BIND_TARGET: BindTextureTarget;
+
+  #[inline(always)]
+  fn size(&'obj self) -> Vec2u32 { self.object().size() }
+  #[inline(always)]
+  fn is_empty(&'obj self) -> bool { self.object().is_empty() }
+}
