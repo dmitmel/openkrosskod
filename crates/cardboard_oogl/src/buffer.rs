@@ -140,19 +140,6 @@ impl<'obj, T> VertexBufferBinding<'obj, T> {
       }
     }
   }
-
-  pub fn draw(
-    &self,
-    _program_binding: &crate::ProgramBinding,
-    mode: DrawPrimitive,
-    start: u32,
-    count: u32,
-  ) {
-    let gl = self.ctx().raw_gl();
-    unsafe {
-      gl.DrawArrays(mode.as_raw(), i32::try_from(start).unwrap(), i32::try_from(count).unwrap())
-    };
-  }
 }
 
 #[derive(Debug)]
@@ -215,26 +202,6 @@ where
 
   fn unbind_completely(self) {
     self.ctx().bound_element_buffer.unbind_unconditionally(self.raw_gl());
-  }
-}
-
-impl<'obj, T: BufferIndex> ElementBufferBinding<'obj, T> {
-  pub fn draw(
-    &self,
-    _program_binding: &crate::ProgramBinding,
-    mode: DrawPrimitive,
-    start: u32,
-    count: u32,
-  ) {
-    let gl = self.ctx().raw_gl();
-    unsafe {
-      gl.DrawElements(
-        mode.as_raw(),
-        i32::try_from(count).unwrap(),
-        T::GL_DRAW_ELEMENTS_DATA_TYPE.as_raw(),
-        (start as usize * mem::size_of::<T>()) as *const c_void,
-      )
-    };
   }
 }
 
@@ -367,6 +334,53 @@ where
   T: BufferIndex,
 {
   const BIND_TARGET: BindBufferTarget = BindBufferTarget::Element;
+}
+
+pub trait DrawableBufferBinding<'obj, Buf: 'obj, T>: BufferBinding<'obj, Buf, T>
+where
+  Buf: Buffer<T>,
+{
+  fn draw(&'obj self, _program_binding: &crate::ProgramBinding, mode: DrawPrimitive) {
+    unsafe { self.__impl_draw(mode, 0, self.len()) }
+  }
+
+  fn draw_slice(
+    &'obj self,
+    _program_binding: &crate::ProgramBinding,
+    mode: DrawPrimitive,
+    start: usize,
+    count: usize,
+  ) {
+    assert!(start < self.len());
+    assert!(start + count <= self.len());
+    unsafe { self.__impl_draw(mode, start, count) }
+  }
+
+  unsafe fn __impl_draw(&'obj self, mode: DrawPrimitive, start: usize, count: usize);
+}
+
+impl<'obj, T> DrawableBufferBinding<'obj, VertexBuffer<T>, T> for VertexBufferBinding<'obj, T> {
+  unsafe fn __impl_draw(&'obj self, mode: DrawPrimitive, start: usize, count: usize) {
+    self.raw_gl().DrawArrays(
+      mode.as_raw(),
+      i32::try_from(start).unwrap(),
+      i32::try_from(count).unwrap(),
+    )
+  }
+}
+
+impl<'obj, T> DrawableBufferBinding<'obj, ElementBuffer<T>, T> for ElementBufferBinding<'obj, T>
+where
+  T: BufferIndex,
+{
+  unsafe fn __impl_draw(&'obj self, mode: DrawPrimitive, start: usize, count: usize) {
+    self.raw_gl().DrawElements(
+      mode.as_raw(),
+      i32::try_from(count).unwrap(),
+      T::GL_DRAW_ELEMENTS_DATA_TYPE.as_raw(),
+      (start as usize * mem::size_of::<T>()) as *const c_void,
+    )
+  }
 }
 
 #[derive(Debug)]

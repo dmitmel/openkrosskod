@@ -140,7 +140,7 @@ impl Renderer {
     }
 
     let bound_vbo = self.vbo.bind();
-    bound_vbo.draw(&program, oogl::DrawPrimitive::TriangleFan, 0, 4);
+    bound_vbo.draw(&program, oogl::DrawPrimitive::TriangleFan);
   }
 
   pub fn draw_text(&mut self, font: &mut Font, pos: Vec2f, text_block: &mut TextBlock<'_>) {

@@ -2,7 +2,10 @@ use crate::debug;
 use crate::impl_prelude::*;
 use prelude_plus::*;
 
-pub use crate::{Buffer, BufferBinding, BufferIndex, CorrespondingUniformType, TextureDataType};
+pub use crate::{
+  Buffer, BufferBinding, BufferIndex, CorrespondingUniformType, DrawableBufferBinding,
+  TextureDataType,
+};
 
 pub trait Object {
   const DEBUG_TYPE_IDENTIFIER: u32;
