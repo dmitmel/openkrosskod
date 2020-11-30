@@ -1,6 +1,6 @@
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Keycode;
-use sdl2::video::GLProfile;
+use sdl2::video::{GLProfile, Window};
 
 use cardboard_math::*;
 use cardboard_oogl::*;
@@ -49,6 +49,7 @@ fn main() {
     .window("cardboard_oogl triangle example", 800, 600)
     .resizable()
     .opengl()
+    .allow_highdpi()
     .build()
     .unwrap();
 
@@ -88,6 +89,13 @@ fn main() {
 
   gl.set_clear_color(color(0.0, 0.0, 0.0, 1.0));
 
+  fn reset_viewport(gl: &Context, window: &Window) {
+    let (w, h) = window.drawable_size();
+    gl.set_viewport(vec2(0, 0), vec2(w as i32, h as i32));
+  }
+
+  reset_viewport(&gl, &window);
+
   'running: loop {
     for event in event_pump.poll_iter() {
       match event {
@@ -95,8 +103,8 @@ fn main() {
           break 'running;
         }
 
-        Event::Window { win_event: WindowEvent::SizeChanged(width, height), .. } => {
-          gl.set_viewport(vec2(0, 0), vec2(width, height));
+        Event::Window { win_event: WindowEvent::SizeChanged(..), .. } => {
+          reset_viewport(&gl, &window);
         }
 
         _ => {}
