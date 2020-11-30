@@ -117,7 +117,7 @@ fn try_main() -> AnyResult<()> {
     .build()
     .context("Failed to create the game window")?;
 
-  let gl_ctx = window
+  let sdl_gl_ctx = window
     .gl_create_context()
     .map_err(AnyError::msg)
     .context("Failed to create an OpenGL context for the game window")?;
@@ -126,10 +126,12 @@ fn try_main() -> AnyResult<()> {
     (GL_CONTEXT_PROFILE, GL_CONTEXT_VERSION)
   );
 
-  let gl = Rc::new(oogl::Context::load_with(&video_subsystem, gl_ctx));
+  let gl = Rc::new(oogl::Context::load_with(&video_subsystem, sdl_gl_ctx));
   debug!("{:?}", gl.capabilities());
+
   gl.set_clear_color(BACKGROUND_COLOR);
   gl.clear(oogl::ClearFlags::COLOR);
+  window.gl_swap_window();
 
   gl.set_blending_enabled(true);
   gl.set_blending_factors(oogl::BlendingFactor::SrcAlpha, oogl::BlendingFactor::OneMinusSrcAlpha);
