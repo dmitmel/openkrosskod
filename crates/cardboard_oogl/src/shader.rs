@@ -152,48 +152,53 @@ impl Program {
     buf
   }
 
+  pub fn get_uniform<T: CorrespondingUniformType>(&self, name: &[u8]) -> Uniform<T> {
+    // TODO: extract into a different function to avoid code bloat due to
+    // monomorphization
+    let location = self.get_uniform_location(name);
+    let data_type = self.get_uniform_type(location);
+    if let Some((actual_type_name, _)) = data_type {
+      assert!(T::CORRESPONDING_UNIFORM_TYPE.is_assignable_to(actual_type_name));
+    }
+    Uniform { location, program_addr: self.addr, data_type, phantom: PhantomData }
+  }
+
   pub fn get_uniform_location(&self, name: &[u8]) -> i32 {
     let gl = self.raw_gl();
     let c_name = CString::new(name).unwrap();
     unsafe { gl.GetUniformLocation(self.addr, c_name.as_ptr()) }
   }
 
-  pub fn get_uniform<T>(&self, name: &[u8]) -> Uniform<T> {
-    let gl = self.raw_gl();
-    let location = self.get_uniform_location(name);
+  pub fn get_uniform_type(&self, location: i32) -> Option<UniformType> {
+    if location == INACTIVE_UNIFORM_LOCATION {
+      return None;
+    }
 
-    // TODO: Add type checking assertions based on the generic T parameter
-    let data_type: Option<(UniformType, u32)> = if location != INACTIVE_UNIFORM_LOCATION {
-      let mut data_type = 0;
-      let mut data_array_len = 0;
-      unsafe {
-        gl.GetActiveUniform(
-          self.addr,
-          location as u32,
-          0,               // name buffer size
-          ptr::null_mut(), // name length without the \0
-          &mut data_array_len,
-          &mut data_type,
-          ptr::null_mut(), // name buffer (we already know the name)
-        )
-      };
-      assert!(data_type > 0);
-      assert!(data_array_len > 0);
-
-      if data_array_len != 1 {
-        todo!("array uniforms");
-      }
-
-      Some((
-        UniformType::from_raw(data_type)
-          .unwrap_or_else(|| panic!("Unknown uniform data type: 0x{:x}", data_type)),
-        data_array_len as u32,
-      ))
-    } else {
-      None
+    let mut data_type = 0;
+    let mut data_array_len = 0;
+    unsafe {
+      self.raw_gl().GetActiveUniform(
+        self.addr,
+        location as u32,
+        0,               // name buffer size
+        ptr::null_mut(), // name length without the \0
+        &mut data_array_len,
+        &mut data_type,
+        ptr::null_mut(), // name buffer
+      )
     };
+    assert!(data_type > 0);
+    assert!(data_array_len > 0);
 
-    Uniform { location, program_addr: self.addr, data_type, phantom: PhantomData }
+    if data_array_len != 1 {
+      todo!("array uniforms");
+    }
+
+    Some((
+      UniformTypeName::from_raw(data_type)
+        .unwrap_or_else(|| panic!("Unknown uniform data type: 0x{:x}", data_type)),
+      data_array_len as u32,
+    ))
   }
 
   pub fn get_attribute_location(&self, name: &[u8]) -> u32 {
@@ -202,41 +207,42 @@ impl Program {
     unsafe { gl.GetAttribLocation(self.addr, c_name.as_ptr()) as u32 }
   }
 
-  pub fn get_attribute<T>(&self, name: &[u8]) -> Attribute<T> {
-    let gl = self.raw_gl();
-    let location = self.get_attribute_location(name);
+  pub fn get_attribute_type(&self, location: u32) -> Option<(AttributeType, u32)> {
+    if location == INACTIVE_ATTRIBUTE_LOCATION {
+      return None;
+    }
 
-    // TODO: See get_uniform
-    let data_type: Option<(AttributeType, u32)> = if location != INACTIVE_ATTRIBUTE_LOCATION {
-      let mut data_type = 0;
-      let mut data_array_len = 0;
-      unsafe {
-        gl.GetActiveAttrib(
-          self.addr,
-          location,
-          0,               // name buffer size
-          ptr::null_mut(), // name length without the \0
-          &mut data_array_len,
-          &mut data_type,
-          ptr::null_mut(), // name buffer (we already know the name)
-        )
-      };
-      assert!(data_type > 0);
-      assert!(data_array_len > 0);
-
-      if data_array_len != 1 {
-        todo!("array attributes");
-      }
-
-      Some((
-        AttributeType::from_raw(data_type)
-          .unwrap_or_else(|| panic!("Unknown attribute data type: 0x{:x}", data_type)),
-        data_array_len as u32,
-      ))
-    } else {
-      None
+    let mut data_type = 0;
+    let mut data_array_len = 0;
+    unsafe {
+      self.raw_gl().GetActiveAttrib(
+        self.addr,
+        location,
+        0,               // name buffer size
+        ptr::null_mut(), // name length without the \0
+        &mut data_array_len,
+        &mut data_type,
+        ptr::null_mut(), // name buffer
+      )
     };
+    assert!(data_type > 0);
+    assert!(data_array_len > 0);
 
+    if data_array_len != 1 {
+      todo!("array attributes");
+    }
+
+    Some((
+      AttributeType::from_raw(data_type)
+        .unwrap_or_else(|| panic!("Unknown attribute data type: 0x{:x}", data_type)),
+      data_array_len as u32,
+    ))
+  }
+
+  pub fn get_attribute<T>(&self, name: &[u8]) -> Attribute<T> {
+    let location = self.get_attribute_location(name);
+    // TODO: See get_uniform
+    let data_type = self.get_attribute_type(location);
     Attribute { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
 }
@@ -258,10 +264,10 @@ impl<'obj> ObjectBinding<'obj, Program> for ProgramBinding<'obj> {
 }
 
 #[derive(Debug)]
-pub struct Uniform<T> {
+pub struct Uniform<T: ?Sized> {
   location: i32,
   program_addr: u32,
-  data_type: Option<(UniformType, u32)>,
+  data_type: Option<UniformType>,
   phantom: PhantomData<*mut T>,
 }
 
@@ -276,18 +282,35 @@ impl<T> Uniform<T> {
   #[inline(always)]
   pub fn program_addr(&self) -> u32 { self.program_addr }
   #[inline(always)]
-  pub fn data_type(&self) -> &Option<(UniformType, u32)> { &self.data_type }
+  pub fn data_type(&self) -> Option<UniformType> { self.data_type }
 
   #[inline(always)]
-  pub fn reflect_from(program: &Program, name: &[u8]) -> Self { program.get_uniform(name) }
+  pub fn reflect_from(program: &Program, name: &[u8]) -> Self
+  where
+    T: CorrespondingUniformType,
+  {
+    program.get_uniform(name)
+  }
 }
 
 macro_rules! impl_set_uniform {
   (
-    $data_type:ty, $arg_pattern:pat, $gl_uniform_func_name:ident($($gl_uniform_func_arg:expr),+)
+    $data_type:ty, $corresponding_type_name:ident,
+    |$arg_pattern:pat| $gl_uniform_func_name:ident($($gl_uniform_func_arg:expr),+) $(,)?
   ) => {
+    impl CorrespondingUniformType for $data_type {
+      const CORRESPONDING_UNIFORM_TYPE: UniformTypeName =
+        UniformTypeName::$corresponding_type_name;
+    }
+
     impl Uniform<$data_type> {
-      pub fn set(&self, program_binding: &ProgramBinding<'_>, $arg_pattern: $data_type) {
+      pub fn set(&self, program_binding: &ProgramBinding<'_>, value: $data_type) {
+        // For some reason applying the pattern directly in the method
+        // signature causes rust-analyzer to report false-positive "argument
+        // count mismatch" errors. Well, nevermind, I'll do that with a local
+        // variable binding then (`value` is inaccessible from the macro
+        // invocation thanks to macro hygiene).
+        let $arg_pattern = value;
         let program = &program_binding.program;
         assert_eq!(self.program_addr, program.addr);
         unsafe { program.raw_gl().$gl_uniform_func_name(self.location, $($gl_uniform_func_arg),+) };
@@ -296,28 +319,20 @@ macro_rules! impl_set_uniform {
   };
 }
 
-impl_set_uniform!(u32, x, Uniform1i(x as i32));
-impl_set_uniform!(i32, x, Uniform1i(x));
-impl_set_uniform!(f32, x, Uniform1f(x));
-impl_set_uniform!((f32, f32), (x, y), Uniform2f(x, y));
-impl_set_uniform!((i32, i32), (x, y), Uniform2i(x, y));
-impl_set_uniform!((u32, u32), (x, y), Uniform2i(x as i32, y as i32));
-impl_set_uniform!(Vec2<f32>, Vec2 { x, y }, Uniform2f(x, y));
-impl_set_uniform!(Vec2<i32>, Vec2 { x, y }, Uniform2i(x, y));
-impl_set_uniform!(Vec2<u32>, Vec2 { x, y }, Uniform2i(x as i32, y as i32));
-impl_set_uniform!(Color<f32>, Color { r, g, b, a }, Uniform4f(r, g, b, a));
+impl_set_uniform!(f32, Float, |x| Uniform1f(x));
+impl_set_uniform!(u32, Int, |x| Uniform1i(x as i32));
+impl_set_uniform!(i32, Int, |x| Uniform1i(x));
+impl_set_uniform!(bool, Bool, |x| Uniform1i(x as i32));
+impl_set_uniform!(Vec2<f32>, Vec2, |Vec2 { x, y }| Uniform2f(x, y));
+impl_set_uniform!(Vec2<i32>, IVec2, |Vec2 { x, y }| Uniform2i(x, y));
+impl_set_uniform!(Vec2<u32>, IVec2, |Vec2 { x, y }| Uniform2i(x as i32, y as i32));
+impl_set_uniform!(Vec2<bool>, BVec2, |Vec2 { x, y }| Uniform2i(x as i32, y as i32));
+impl_set_uniform!(Color<f32>, Vec4, |Color { r, g, b, a }| Uniform4f(r, g, b, a));
 
-impl<T: crate::TextureDataType> Uniform<crate::Texture2DBinding<'_, T>> {
-  #[inline(always)]
-  pub fn set(&self, program_binding: &ProgramBinding<'_>, tex: crate::Texture2DBinding<'_, T>) {
-    let program = &program_binding.program;
-    assert_eq!(self.program_addr, program.addr);
-    unsafe { program.raw_gl().Uniform1i(self.location, tex.unit() as i32) };
-  }
-}
+type UniformType = (UniformTypeName, u32);
 
 gl_enum!({
-  pub enum UniformType {
+  pub enum UniformTypeName {
     Float = FLOAT,
     Vec2 = FLOAT_VEC2,
     Vec3 = FLOAT_VEC3,
@@ -338,8 +353,8 @@ gl_enum!({
   }
 });
 
-impl UniformType {
-  pub fn components(&self) -> u8 {
+impl UniformTypeName {
+  pub fn components(self) -> u8 {
     match self {
       Self::Float | Self::Int | Self::Bool => 1,
       Self::Vec2 | Self::IVec2 | Self::BVec2 => 2,
@@ -351,6 +366,19 @@ impl UniformType {
       Self::Sampler2D | Self::SamplerCube => 1,
     }
   }
+
+  pub fn is_assignable_to(self, other: UniformTypeName) -> bool {
+    use UniformTypeName::*;
+    match (self, other) {
+      _ if self == other => true,
+      (Int, Sampler2D) => true,
+      _ => false,
+    }
+  }
+}
+
+pub trait CorrespondingUniformType {
+  const CORRESPONDING_UNIFORM_TYPE: UniformTypeName;
 }
 
 #[derive(Debug)]
