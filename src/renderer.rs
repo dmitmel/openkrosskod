@@ -68,7 +68,8 @@ impl Renderer {
       bound_vbo.object().set_debug_label(b"vbo");
       bound_vbo.enable_attributes();
       bound_vbo.configure_attributes();
-      bound_vbo.set_data(&[[-1, -1], [-1, 1], [1, 1], [1, -1]], oogl::BufferUsageHint::StaticDraw);
+      bound_vbo
+        .reserve_and_set(oogl::BufferUsageHint::StaticDraw, &[[-1, -1], [-1, 1], [1, 1], [1, -1]]);
     }
 
     let mut white_texture =

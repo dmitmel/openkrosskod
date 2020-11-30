@@ -562,8 +562,6 @@ impl Game {
       coll.pos.y = coll.pos.y.clamp2_abs((window_size.y / 2.0 - coll.size.y / 2.0).abs())
     }
 
-    // dbg!(left_racket.coll.vel, right_racket.coll.vel);
-
     // TODO: Rewrite the collision handling system. The current one leaves a lot
     // to be desired.
     for racket in &mut [&mut *left_racket, &mut *right_racket] {

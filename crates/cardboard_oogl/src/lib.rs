@@ -1,5 +1,6 @@
 #![feature(negative_impls)]
 #![deny(missing_debug_implementations)]
+#![allow(clippy::missing_safety_doc)]
 
 macro_rules! gl_enum {
   // a wrapper for autoformatting purposes
