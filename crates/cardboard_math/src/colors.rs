@@ -33,3 +33,13 @@ impl<T> Color<T> {
   #[inline]
   pub fn with_alpha(self, a: T) -> Self { Self { r: self.r, g: self.g, b: self.b, a } }
 }
+
+impl<T> AsRef<[T; 4]> for Color<T> {
+  #[inline(always)]
+  fn as_ref(&self) -> &[T; 4] { unsafe { &*(self as *const _ as *const [T; 4]) } }
+}
+
+impl<T> AsMut<[T; 4]> for Color<T> {
+  #[inline(always)]
+  fn as_mut(&mut self) -> &mut [T; 4] { unsafe { &mut *(self as *mut _ as *mut [T; 4]) } }
+}

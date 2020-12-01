@@ -98,6 +98,16 @@ impl<T> Vec2<T> {
   }
 }
 
+impl<T> AsRef<[T; 2]> for Vec2<T> {
+  #[inline(always)]
+  fn as_ref(&self) -> &[T; 2] { unsafe { &*(self as *const _ as *const [T; 2]) } }
+}
+
+impl<T> AsMut<[T; 2]> for Vec2<T> {
+  #[inline(always)]
+  fn as_mut(&mut self) -> &mut [T; 2] { unsafe { &mut *(self as *mut _ as *mut [T; 2]) } }
+}
+
 macro_rules! impl_vec2_operator {
   (unary, $ty:ty, $op:ident, fn $op_fn:ident($this:ident) $op_fn_body:block) => {
     impl $op for Vec2<$ty> {
