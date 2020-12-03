@@ -40,6 +40,7 @@ impl Context {
     crate::debug::init(&gl);
 
     let capabilities = ContextCapabilities::load(&gl);
+    assert!(capabilities.extensions.gl_oes_texture_npot);
 
     Self {
       raw_gl: gl,
@@ -289,7 +290,10 @@ macro_rules! generate_context_extensions_struct {
   };
 }
 
-generate_context_extensions_struct![("GL_KHR_debug", gl_khr_debug)];
+generate_context_extensions_struct![
+  ("GL_KHR_debug", gl_khr_debug),
+  ("GL_OES_texture_npot", gl_oes_texture_npot),
+];
 
 // gl_enum!({
 //   pub enum NumberPrecisionType {
