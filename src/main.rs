@@ -164,8 +164,7 @@ fn try_main() -> AnyResult<()> {
   let ball_texture = load_texture_asset(&globals, "ball.png", oogl::TextureFilter::Linear)?;
   let font_texture = load_texture_asset(&globals, "font.png", oogl::TextureFilter::Nearest)?;
 
-  let renderer =
-    Renderer::init(Rc::clone(&globals)).context("Failed to initialize the renderer")?;
+  let renderer = Renderer::init(globals.share()).context("Failed to initialize the renderer")?;
 
   globals.gl.release_shader_compiler();
 

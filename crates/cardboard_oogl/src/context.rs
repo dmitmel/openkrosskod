@@ -5,6 +5,10 @@ use prelude_plus::*;
 pub type RawGL = Gles2;
 
 pub type SharedContext = Rc<Context>;
+impl Context {
+  #[inline(always)]
+  pub fn share(self: &SharedContext) -> SharedContext { Rc::clone(&self) }
+}
 
 pub struct Context {
   raw_gl: RawGL,

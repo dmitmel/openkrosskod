@@ -58,16 +58,16 @@ fn main() {
 
   let mut event_pump = sdl_context.event_pump().unwrap();
 
-  let vs = compile_shader(Rc::clone(&gl), VS_SRC, ShaderType::Vertex);
-  let fs = compile_shader(Rc::clone(&gl), FS_SRC, ShaderType::Fragment);
+  let vs = compile_shader(gl.share(), VS_SRC, ShaderType::Vertex);
+  let fs = compile_shader(gl.share(), FS_SRC, ShaderType::Fragment);
 
-  let mut program = link_program(Rc::clone(&gl), &vs, &fs);
+  let mut program = link_program(gl.share(), &vs, &fs);
   let attr_pos = program.get_attribute::<Vec2f>(b"a_pos");
   let attr_color = program.get_attribute::<Colorf>(b"a_color");
   let bound_program = program.bind();
 
   let mut vbo = VertexBuffer::<Vertex>::new(
-    Rc::clone(&gl),
+    gl.share(),
     vec![attr_pos.to_pointer_simple(), attr_color.to_pointer_simple()],
   );
 

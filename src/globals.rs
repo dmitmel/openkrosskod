@@ -29,7 +29,7 @@ pub struct Globals {
 
 impl Globals {
   #[inline(always)]
-  pub fn share_gl(&self) -> oogl::SharedContext { Rc::clone(&self.gl) }
+  pub fn share(self: &SharedGlobals) -> SharedGlobals { Rc::clone(&self) }
 }
 
 #[derive(Debug)]

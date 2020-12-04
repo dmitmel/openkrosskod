@@ -53,7 +53,7 @@ impl Renderer {
     );
 
     let mut vbo = oogl::VertexBuffer::new(
-      globals.share_gl(),
+      globals.gl.share(),
       // this attribute pointer will be the same for both programs because both
       // use the same vertex shader, as such the VBO can be shared
       vec![rectangle_program_reflection.a_pos.to_pointer(oogl::AttributePtrType {
@@ -72,10 +72,10 @@ impl Renderer {
         .reserve_and_set(oogl::BufferUsageHint::StaticDraw, &[[-1, -1], [-1, 1], [1, 1], [1, -1]]);
     }
 
-    let texture_unit = oogl::TextureUnit::new(globals.share_gl());
+    let texture_unit = oogl::TextureUnit::new(globals.gl.share());
 
     let mut white_texture =
-      oogl::Texture2D::new(globals.share_gl(), oogl::TextureInputFormat::RGBA, None);
+      oogl::Texture2D::new(globals.gl.share(), oogl::TextureInputFormat::RGBA, None);
     {
       let bound_texture = white_texture.bind(&texture_unit);
       bound_texture.object().set_debug_label(b"white_texture");
@@ -112,7 +112,7 @@ impl Renderer {
   }
 
   pub fn draw_shape(&mut self, shape: &mut Shape) {
-    let texture_unit = oogl::TextureUnit::new(self.globals.share_gl());
+    let texture_unit = oogl::TextureUnit::new(self.globals.gl.share());
     let (color, _bound_texture) = match &mut shape.fill {
       ShapeFill::Color(color) => (*color, self.white_texture.bind(&texture_unit)),
       ShapeFill::Texture(bound_texture) => (colorn(1.0, 1.0), bound_texture.bind(&texture_unit)),
@@ -274,7 +274,7 @@ pub fn load_shader_asset(
   type_: oogl::ShaderType,
 ) -> AnyResult<oogl::Shader> {
   let file_contents = globals.game_fs.read_binary_file(&path)?;
-  let shader = compile_shader(globals.share_gl(), &file_contents, type_)
+  let shader = compile_shader(globals.gl.share(), &file_contents, type_)
     .with_context(|| format!("Failed to compile the shader '{}'", path))?;
   shader.set_debug_label(path.as_bytes());
   Ok(shader)
@@ -285,7 +285,7 @@ pub fn load_program_asset(
   name: &str,
   shaders: &[&oogl::Shader],
 ) -> AnyResult<oogl::Program> {
-  let program = link_program(globals.share_gl(), shaders)
+  let program = link_program(globals.gl.share(), shaders)
     .with_context(|| format!("Failed to link program '{}'", name))?;
   program.set_debug_label(name.as_bytes());
   Ok(program)
@@ -342,9 +342,9 @@ pub fn load_texture_asset(
 ) -> AnyResult<oogl::Texture2D> {
   let file = globals.game_fs.open_file(&path)?;
 
-  let mut texture = load_texture_data_from_png(globals.share_gl(), path.as_bytes(), file)
+  let mut texture = load_texture_data_from_png(globals.gl.share(), path.as_bytes(), file)
     .with_context(|| format!("Failed to decode '{}'", path))?;
-  let texture_unit = oogl::TextureUnit::new(globals.share_gl());
+  let texture_unit = oogl::TextureUnit::new(globals.gl.share());
   let bound_texture = texture.bind(&texture_unit);
   bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
   bound_texture.set_filters(filter, None);
@@ -379,7 +379,7 @@ pub fn load_texture_data_from_png<R: Read>(
     _ => unimplemented!("Unsupported texture color type: {:?}", info.color_type),
   };
 
-  let texture_unit = oogl::TextureUnit::new(Rc::clone(&gl));
+  let texture_unit = oogl::TextureUnit::new(gl.share());
   let mut texture = oogl::Texture2D::new(gl, gl_format, None);
   let bound_texture = texture.bind(&texture_unit);
   bound_texture.object().set_debug_label(debug_label);
