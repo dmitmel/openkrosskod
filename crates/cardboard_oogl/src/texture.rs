@@ -1,4 +1,5 @@
 use crate::impl_prelude::*;
+use crate::TextureUnit;
 use cardboard_math::*;
 use prelude_plus::*;
 
@@ -97,22 +98,21 @@ impl<T: TextureDataType> Texture2D<T> {
     lod_count_for_axis(size.x).max(lod_count_for_axis(size.y))
   }
 
-  pub fn bind(&'_ mut self) -> Texture2DBinding<'_, T> {
+  pub fn bind(&'_ mut self, unit: &TextureUnit) -> Texture2DBinding<'_, T> {
     let binding_target = &self.ctx.bound_texture_2d;
     binding_target.on_binding_created(self.addr);
 
-    let unit = self.ctx.alloc_texture_unit();
     let different_texture_was_bound = binding_target.bound_addr() != self.addr;
-    let different_unit_was_selected = self.ctx.active_texture_unit() != unit;
+    let different_unit_was_selected = self.ctx.active_texture_unit() != unit.id();
 
     if different_unit_was_selected {
-      unsafe { self.ctx.set_active_texture_unit(unit) };
+      unsafe { self.ctx.set_active_texture_unit(unit.id()) };
     }
     if different_texture_was_bound || different_unit_was_selected {
       binding_target.bind_unconditionally(self.raw_gl(), self.addr);
       self.internal_state_acquired = true;
     }
-    Texture2DBinding { texture: self, unit }
+    Texture2DBinding { texture: self }
   }
 }
 
@@ -131,7 +131,6 @@ impl TextureDataType for u8 {
 #[derive(Debug)]
 pub struct Texture2DBinding<'obj, T: TextureDataType = u8> {
   texture: &'obj mut Texture2D<T>,
-  unit: u32,
 }
 
 impl<'obj, T> ObjectBinding<'obj, Texture2D<T>> for Texture2DBinding<'obj, T>
@@ -145,18 +144,11 @@ where
 }
 
 impl<'obj, T: TextureDataType> Drop for Texture2DBinding<'obj, T> {
-  fn drop(&mut self) {
-    let ctx = self.ctx();
-    ctx.free_texture_unit(self.unit);
-    ctx.bound_texture_2d.on_binding_dropped();
-  }
+  fn drop(&mut self) { self.ctx().bound_texture_2d.on_binding_dropped(); }
 }
 
 impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
   pub const BIND_TARGET: BindTextureTarget = Texture2D::<T>::BIND_TARGET;
-
-  #[inline(always)]
-  pub fn unit(&self) -> u32 { self.unit }
 
   #[inline(always)]
   pub fn size(&self) -> Vec2u32 { self.texture.size() }

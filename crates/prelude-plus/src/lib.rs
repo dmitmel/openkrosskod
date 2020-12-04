@@ -11,6 +11,7 @@ pub use std::env;
 pub use std::ffi::{self, CStr, CString, OsStr, OsString};
 pub use std::fmt;
 pub use std::fs::{self, File, OpenOptions as FileOpenOptions};
+pub use std::hash::{Hash, Hasher};
 pub use std::io::{self, BufRead, BufReader, BufWriter, Read, Seek, Write};
 pub use std::iter::{self, FromIterator};
 pub use std::marker::PhantomData;

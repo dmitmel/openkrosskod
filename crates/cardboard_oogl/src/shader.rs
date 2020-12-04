@@ -161,7 +161,7 @@ impl Program {
     let location = self.get_uniform_location(name);
     let data_type = self.get_uniform_type(location);
     if let Some(data_type) = &data_type {
-      assert!(T::CORRESPONDING_UNIFORM_TYPE.is_assignable_to(data_type.name));
+      assert!(T::CORRESPONDING_UNIFORM_TYPES.contains(&data_type.name));
     }
     Uniform { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
@@ -244,7 +244,7 @@ impl Program {
 
   pub fn get_attribute<T: CorrespondingAttributePtrType>(&self, name: &[u8]) -> Attribute<T> {
     let location = self.get_attribute_location(name);
-    // TODO: See get_uniform
+    // TODO: Add type validation for attributes as well.
     let data_type = self.get_attribute_type(location);
     Attribute { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
@@ -302,12 +302,12 @@ impl<T: CorrespondingUniformType> Uniform<T> {
 
 macro_rules! impl_set_uniform {
   (
-    $data_type:ty, $corresponding_type_name:ident,
-    |$arg_pattern:pat| $gl_uniform_func_name:ident($($gl_uniform_func_arg:expr),+) $(,)?
+    $data_type:ty, [$($corresponding_type_name:ident),+],
+    $arg_pattern:pat, $gl_uniform_func_name:ident($($gl_uniform_func_arg:expr),+) $(,)?
   ) => {
     impl CorrespondingUniformType for $data_type {
-      const CORRESPONDING_UNIFORM_TYPE: UniformTypeName =
-        UniformTypeName::$corresponding_type_name;
+      const CORRESPONDING_UNIFORM_TYPES: &'static [UniformTypeName] =
+        &[$(UniformTypeName::$corresponding_type_name),+];
     }
 
     impl Uniform<$data_type> {
@@ -326,15 +326,16 @@ macro_rules! impl_set_uniform {
   };
 }
 
-impl_set_uniform!(f32, Float, |x| Uniform1f(x));
-impl_set_uniform!(u32, Int, |x| Uniform1i(x as i32));
-impl_set_uniform!(i32, Int, |x| Uniform1i(x));
-impl_set_uniform!(bool, Bool, |x| Uniform1i(x as i32));
-impl_set_uniform!(Vec2<f32>, Vec2, |Vec2 { x, y }| Uniform2f(x, y));
-impl_set_uniform!(Vec2<i32>, IVec2, |Vec2 { x, y }| Uniform2i(x, y));
-impl_set_uniform!(Vec2<u32>, IVec2, |Vec2 { x, y }| Uniform2i(x as i32, y as i32));
-impl_set_uniform!(Vec2<bool>, BVec2, |Vec2 { x, y }| Uniform2i(x as i32, y as i32));
-impl_set_uniform!(Color<f32>, Vec4, |Color { r, g, b, a }| Uniform4f(r, g, b, a));
+impl_set_uniform!(f32, [Float], x, Uniform1f(x));
+impl_set_uniform!(u32, [Int], x, Uniform1i(x as i32));
+impl_set_uniform!(i32, [Int], x, Uniform1i(x));
+impl_set_uniform!(bool, [Bool], x, Uniform1i(x as i32));
+impl_set_uniform!(Vec2<f32>, [Vec2], Vec2 { x, y }, Uniform2f(x, y));
+impl_set_uniform!(Vec2<i32>, [IVec2], Vec2 { x, y }, Uniform2i(x, y));
+impl_set_uniform!(Vec2<u32>, [IVec2], Vec2 { x, y }, Uniform2i(x as i32, y as i32));
+impl_set_uniform!(Vec2<bool>, [BVec2], Vec2 { x, y }, Uniform2i(x as i32, y as i32));
+impl_set_uniform!(Color<f32>, [Vec4], Color { r, g, b, a }, Uniform4f(r, g, b, a));
+impl_set_uniform!(crate::TextureUnit, [Sampler2D, SamplerCube], unit, Uniform1i(unit.id() as i32));
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct UniformType {
@@ -377,19 +378,10 @@ impl UniformTypeName {
       Self::Sampler2D | Self::SamplerCube => 1,
     }
   }
-
-  pub fn is_assignable_to(self, other: UniformTypeName) -> bool {
-    use UniformTypeName::*;
-    match (self, other) {
-      _ if self == other => true,
-      (Int, Sampler2D) => true,
-      _ => false,
-    }
-  }
 }
 
 pub trait CorrespondingUniformType {
-  const CORRESPONDING_UNIFORM_TYPE: UniformTypeName;
+  const CORRESPONDING_UNIFORM_TYPES: &'static [UniformTypeName];
 }
 
 #[derive(Debug)]
