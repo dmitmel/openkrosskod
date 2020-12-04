@@ -38,11 +38,10 @@ impl Framebuffer {
   }
 
   pub fn bind(&'_ mut self) -> FramebufferBinding<'_> {
-    self.ctx.bound_framebuffer.bind_if_needed(
-      &self.ctx.raw_gl(),
-      self.addr,
-      &mut self.internal_state_acquired,
-    );
+    let binding_target = &self.ctx.bound_framebuffer;
+    binding_target.on_binding_created(self.addr);
+    binding_target.bind_if_needed(&self.ctx.raw_gl(), self.addr);
+    self.internal_state_acquired = true;
     FramebufferBinding { framebuffer: self }
   }
 }
@@ -63,6 +62,10 @@ impl<'obj> ObjectBinding<'obj, Framebuffer> for FramebufferBinding<'obj> {
   fn unbind_completely(self) {
     self.ctx().bound_framebuffer.unbind_unconditionally(self.raw_gl());
   }
+}
+
+impl<'obj> Drop for FramebufferBinding<'obj> {
+  fn drop(&mut self) { self.ctx().bound_framebuffer.on_binding_dropped(); }
 }
 
 impl<'obj> FramebufferBinding<'obj> {

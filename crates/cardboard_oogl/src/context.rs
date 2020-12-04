@@ -110,17 +110,46 @@ impl fmt::Debug for Context {
 pub(crate) struct BindingTarget<T> {
   target: u32,
   bound_addr: Cell<u32>,
+  is_binding_alive: Cell<bool>,
   phantom: PhantomData<*mut T>,
 }
+
+#[allow(dead_code)]
 impl<T> BindingTarget<T> {
+  #[inline(always)]
+  pub(crate) fn target(&self) -> u32 { self.target }
   #[inline(always)]
   pub(crate) fn bound_addr(&self) -> u32 { self.bound_addr.get() }
   #[inline(always)]
-  #[allow(dead_code)]
   pub(crate) fn is_anything_bound(&self) -> bool { self.bound_addr() != 0 }
+  #[inline(always)]
+  pub(crate) fn is_binding_alive(&self) -> bool { self.is_binding_alive.get() }
+
   pub(crate) fn new(target: u32) -> Self {
-    Self { target, bound_addr: Cell::new(0), phantom: PhantomData }
+    Self {
+      target,
+      bound_addr: Cell::new(0),
+      is_binding_alive: Cell::new(false),
+      phantom: PhantomData,
+    }
   }
+
+  #[inline(never)]
+  #[track_caller]
+  pub(crate) fn on_binding_created(&self, addr: u32) {
+    if !self.is_binding_alive.get() {
+      self.is_binding_alive.set(true);
+    } else {
+      panic!(
+        "attempt to bind object #{} while the binding of object #{} is still alive",
+        addr,
+        self.bound_addr.get(),
+      );
+    }
+  }
+
+  #[inline(always)]
+  pub(crate) fn on_binding_dropped(&self) { self.is_binding_alive.set(false); }
 }
 
 macro_rules! impl_binding_target_state {
@@ -142,10 +171,9 @@ macro_rules! impl_binding_target_state {
       }
 
       #[inline]
-      pub(crate) fn bind_if_needed(&self, gl: &RawGL, addr: u32, set_on_bind_flag: &mut bool) {
+      pub(crate) fn bind_if_needed(&self, gl: &RawGL, addr: u32) {
         if self.bound_addr.get() != addr {
           self.bind_unconditionally(gl, addr);
-          *set_on_bind_flag = true;
         }
       }
     }
@@ -156,14 +184,6 @@ impl_binding_target_state!(ProgramBindingTarget, UseProgram());
 impl_binding_target_state!(BufferBindingTarget, BindBuffer(target));
 impl_binding_target_state!(TextureBindingTarget, BindTexture(target));
 impl_binding_target_state!(FramebufferBindingTarget, BindFramebuffer(target));
-
-// #[derive(Debug)]
-// pub struct BindingContext<T> {
-//   phantom: PhantomData<*mut T>,
-// }
-// impl<T> BindingContext<T> {
-//   pub fn new() -> Self { Self { phantom: PhantomData } }
-// }
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
 pub struct ContextCapabilities {

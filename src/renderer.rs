@@ -344,6 +344,7 @@ pub fn load_texture_asset(
   let bound_texture = texture.bind(None);
   bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
   bound_texture.set_filters(filter, None);
+  drop(bound_texture);
 
   Ok(texture)
 }
@@ -379,6 +380,7 @@ pub fn load_texture_data_from_png<R: Read>(
   bound_texture.object().set_debug_label(debug_label);
   bound_texture.set_size(vec2(info.width, info.height));
   bound_texture.reserve_and_set(0, &buf);
+  drop(bound_texture);
 
   Ok(texture)
 }

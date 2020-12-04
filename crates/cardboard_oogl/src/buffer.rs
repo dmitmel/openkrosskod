@@ -70,11 +70,10 @@ impl<T> VertexBuffer<T> {
   }
 
   pub fn bind(&mut self) -> VertexBufferBinding<'_, T> {
-    self.ctx.bound_vertex_buffer.bind_if_needed(
-      self.ctx.raw_gl(),
-      self.addr,
-      &mut self.internal_state_acquired,
-    );
+    let binding_target = &self.ctx.bound_vertex_buffer;
+    binding_target.on_binding_created(self.addr);
+    binding_target.bind_if_needed(self.ctx.raw_gl(), self.addr);
+    self.internal_state_acquired = true;
     VertexBufferBinding { buffer: self }
   }
 }
@@ -95,6 +94,10 @@ impl<'obj, T> ObjectBinding<'obj, VertexBuffer<T>> for VertexBufferBinding<'obj,
   fn unbind_completely(self) {
     self.ctx().bound_vertex_buffer.unbind_unconditionally(self.raw_gl());
   }
+}
+
+impl<'obj, T> Drop for VertexBufferBinding<'obj, T> {
+  fn drop(&mut self) { self.ctx().bound_vertex_buffer.on_binding_dropped(); }
 }
 
 impl<'obj, T> VertexBufferBinding<'obj, T> {
@@ -176,11 +179,10 @@ impl<T: BufferIndex> ElementBuffer<T> {
   }
 
   pub fn bind(&mut self) -> ElementBufferBinding<'_, T> {
-    self.ctx.bound_element_buffer.bind_if_needed(
-      self.ctx.raw_gl(),
-      self.addr,
-      &mut self.internal_state_acquired,
-    );
+    let binding_target = &self.ctx.bound_element_buffer;
+    binding_target.on_binding_created(self.addr);
+    binding_target.bind_if_needed(self.ctx.raw_gl(), self.addr);
+    self.internal_state_acquired = true;
     ElementBufferBinding { buffer: self }
   }
 }
@@ -204,6 +206,10 @@ where
   fn unbind_completely(self) {
     self.ctx().bound_element_buffer.unbind_unconditionally(self.raw_gl());
   }
+}
+
+impl<'obj, T: BufferIndex> Drop for ElementBufferBinding<'obj, T> {
+  fn drop(&mut self) { self.ctx().bound_element_buffer.on_binding_dropped(); }
 }
 
 gl_enum!({

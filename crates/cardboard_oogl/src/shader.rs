@@ -112,7 +112,9 @@ impl Program {
   }
 
   pub fn bind(&'_ mut self) -> ProgramBinding<'_> {
-    self.ctx.bound_program.bind_if_needed(self.ctx.raw_gl(), self.addr, &mut false);
+    let binding_target = &self.ctx.bound_program;
+    binding_target.on_binding_created(self.addr);
+    binding_target.bind_if_needed(self.ctx.raw_gl(), self.addr);
     ProgramBinding { program: self }
   }
 
@@ -262,6 +264,10 @@ impl<'obj> ObjectBinding<'obj, Program> for ProgramBinding<'obj> {
   fn object(&self) -> &Program { &self.program }
 
   fn unbind_completely(self) { self.ctx().bound_program.unbind_unconditionally(self.raw_gl()); }
+}
+
+impl<'obj> Drop for ProgramBinding<'obj> {
+  fn drop(&mut self) { self.ctx().bound_program.on_binding_dropped(); }
 }
 
 #[derive(Debug)]

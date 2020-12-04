@@ -102,7 +102,10 @@ impl<T: TextureDataType> Texture2D<T> {
     let unit = unit_preference.unwrap_or(self.ctx.active_texture_unit.get());
     assert!(unit < self.ctx.capabilities().max_texture_units);
 
-    let different_texture_was_bound = self.ctx.bound_texture_2d.bound_addr() != self.addr;
+    let binding_target = &self.ctx.bound_texture_2d;
+    binding_target.on_binding_created(self.addr);
+
+    let different_texture_was_bound = binding_target.bound_addr() != self.addr;
     let different_unit_was_selected = self.ctx.active_texture_unit.get() != unit;
 
     if different_texture_was_bound || different_unit_was_selected {
@@ -113,7 +116,7 @@ impl<T: TextureDataType> Texture2D<T> {
         self.ctx.active_texture_unit.set(unit);
       }
 
-      self.ctx.bound_texture_2d.bind_unconditionally(gl, self.addr);
+      binding_target.bind_unconditionally(gl, self.addr);
       self.internal_state_acquired = true;
     }
     Texture2DBinding { texture: self, unit }
@@ -146,6 +149,10 @@ where
   fn object(&self) -> &Texture2D<T> { &self.texture }
 
   fn unbind_completely(self) { self.ctx().bound_texture_2d.unbind_unconditionally(self.raw_gl()); }
+}
+
+impl<'obj, T: TextureDataType> Drop for Texture2DBinding<'obj, T> {
+  fn drop(&mut self) { self.ctx().bound_texture_2d.on_binding_dropped(); }
 }
 
 impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
