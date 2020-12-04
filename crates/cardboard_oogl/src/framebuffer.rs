@@ -40,14 +40,14 @@ impl Framebuffer {
   pub fn bind(&'_ mut self) -> FramebufferBinding<'_> {
     let binding_target = &self.ctx.bound_framebuffer;
     binding_target.on_binding_created(self.addr);
-    binding_target.bind_if_needed(&self.ctx.raw_gl(), self.addr);
+    binding_target.bind_if_needed(self.raw_gl(), self.addr);
     self.internal_state_acquired = true;
     FramebufferBinding { framebuffer: self }
   }
 }
 
 impl Drop for Framebuffer {
-  fn drop(&mut self) { unsafe { self.ctx.raw_gl().DeleteFramebuffers(1, &self.addr) }; }
+  fn drop(&mut self) { unsafe { self.raw_gl().DeleteFramebuffers(1, &self.addr) }; }
 }
 
 #[derive(Debug)]

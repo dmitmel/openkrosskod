@@ -72,7 +72,7 @@ impl<T> VertexBuffer<T> {
   pub fn bind(&mut self) -> VertexBufferBinding<'_, T> {
     let binding_target = &self.ctx.bound_vertex_buffer;
     binding_target.on_binding_created(self.addr);
-    binding_target.bind_if_needed(self.ctx.raw_gl(), self.addr);
+    binding_target.bind_if_needed(self.raw_gl(), self.addr);
     self.internal_state_acquired = true;
     VertexBufferBinding { buffer: self }
   }
@@ -181,7 +181,7 @@ impl<T: BufferIndex> ElementBuffer<T> {
   pub fn bind(&mut self) -> ElementBufferBinding<'_, T> {
     let binding_target = &self.ctx.bound_element_buffer;
     binding_target.on_binding_created(self.addr);
-    binding_target.bind_if_needed(self.ctx.raw_gl(), self.addr);
+    binding_target.bind_if_needed(self.raw_gl(), self.addr);
     self.internal_state_acquired = true;
     ElementBufferBinding { buffer: self }
   }

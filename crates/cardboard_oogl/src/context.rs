@@ -14,9 +14,11 @@ pub struct Context {
   pub(crate) bound_program: BindingTarget<ProgramBindingTarget>,
   pub(crate) bound_vertex_buffer: BindingTarget<BufferBindingTarget>,
   pub(crate) bound_element_buffer: BindingTarget<BufferBindingTarget>,
-  pub(crate) active_texture_unit: Cell<u32>,
   pub(crate) bound_texture_2d: BindingTarget<TextureBindingTarget>,
   pub(crate) bound_framebuffer: BindingTarget<FramebufferBindingTarget>,
+
+  active_texture_unit: Cell<u32>,
+  free_texture_units: UnsafeCell<Vec<u32>>,
 }
 
 impl !Send for Context {}
@@ -42,6 +44,12 @@ impl Context {
     let capabilities = ContextCapabilities::load(&gl);
     assert!(capabilities.extensions.gl_oes_texture_npot);
 
+    // TODO: put this into some kind of GL configuration struct
+    const MAX_USABLE_TEXTURE_UNITS: u32 = 16;
+    let free_texture_units = UnsafeCell::new(
+      (0..capabilities.max_texture_units.min(MAX_USABLE_TEXTURE_UNITS)).rev().collect(),
+    );
+
     Self {
       raw_gl: gl,
       sdl_gl_context,
@@ -52,14 +60,29 @@ impl Context {
       bound_program: BindingTarget::new(gl::NONE),
       bound_vertex_buffer: BindingTarget::new(crate::BindBufferTarget::Vertex.as_raw()),
       bound_element_buffer: BindingTarget::new(crate::BindBufferTarget::Element.as_raw()),
-      active_texture_unit: Cell::new(0),
       bound_texture_2d: BindingTarget::new(crate::BindTextureTarget::Texture2D.as_raw()),
       bound_framebuffer: BindingTarget::new(crate::BindFramebufferTarget::Default.as_raw()),
+
+      active_texture_unit: Cell::new(0),
+      free_texture_units,
     }
   }
 
   #[inline(always)]
   pub fn active_texture_unit(&self) -> u32 { self.active_texture_unit.get() }
+
+  pub(crate) unsafe fn set_active_texture_unit(&self, unit: u32) {
+    self.raw_gl.ActiveTexture(gl::TEXTURE0 + unit as u32);
+    self.active_texture_unit.set(unit);
+  }
+
+  pub(crate) fn alloc_texture_unit(&self) -> u32 {
+    unsafe { &mut *self.free_texture_units.get() }.pop().expect("no free texture units left")
+  }
+
+  pub(crate) fn free_texture_unit(&self, unit: u32) {
+    unsafe { &mut *self.free_texture_units.get() }.push(unit);
+  }
 
   pub fn set_clear_color(&self, color: Colorf) {
     unsafe { self.raw_gl.ClearColor(color.r, color.g, color.b, color.a) };
@@ -134,18 +157,21 @@ impl<T> BindingTarget<T> {
     }
   }
 
-  #[inline(never)]
-  #[track_caller]
+  #[inline]
   pub(crate) fn on_binding_created(&self, addr: u32) {
-    if !self.is_binding_alive.get() {
-      self.is_binding_alive.set(true);
-    } else {
-      panic!(
-        "attempt to bind object #{} while the binding of object #{} is still alive",
-        addr,
-        self.bound_addr.get(),
-      );
+    if self.is_binding_alive.get() {
+      #[inline(never)]
+      #[cold]
+      #[track_caller]
+      fn on_binding_created_fail(addr_new: u32, addr_old: u32) {
+        panic!(
+          "attempt to bind object #{} while the binding of object #{} is still alive",
+          addr_new, addr_old,
+        );
+      }
+      on_binding_created_fail(addr, self.bound_addr.get());
     }
+    self.is_binding_alive.set(true);
   }
 
   #[inline(always)]

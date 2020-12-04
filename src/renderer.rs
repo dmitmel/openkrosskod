@@ -75,7 +75,7 @@ impl Renderer {
     let mut white_texture =
       oogl::Texture2D::new(globals.share_gl(), oogl::TextureInputFormat::RGBA, None);
     {
-      let bound_texture = white_texture.bind(None);
+      let bound_texture = white_texture.bind();
       bound_texture.object().set_debug_label(b"white_texture");
       bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
       bound_texture.set_filters(oogl::TextureFilter::Linear, None);
@@ -111,8 +111,8 @@ impl Renderer {
 
   pub fn draw_shape(&mut self, shape: &mut Shape) {
     let (color, bound_texture) = match &mut shape.fill {
-      ShapeFill::Color(color) => (*color, self.white_texture.bind(None)),
-      ShapeFill::Texture(bound_texture) => (colorn(1.0, 1.0), bound_texture.bind(None)),
+      ShapeFill::Color(color) => (*color, self.white_texture.bind()),
+      ShapeFill::Texture(bound_texture) => (colorn(1.0, 1.0), bound_texture.bind()),
     };
 
     let (program, reflection) = match shape.type_ {
@@ -341,7 +341,7 @@ pub fn load_texture_asset(
 
   let mut texture = load_texture_data_from_png(globals.share_gl(), path.as_bytes(), file)
     .with_context(|| format!("Failed to decode '{}'", path))?;
-  let bound_texture = texture.bind(None);
+  let bound_texture = texture.bind();
   bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
   bound_texture.set_filters(filter, None);
   drop(bound_texture);
@@ -376,7 +376,7 @@ pub fn load_texture_data_from_png<R: Read>(
   };
 
   let mut texture = oogl::Texture2D::new(gl, gl_format, None);
-  let bound_texture = texture.bind(None);
+  let bound_texture = texture.bind();
   bound_texture.object().set_debug_label(debug_label);
   bound_texture.set_size(vec2(info.width, info.height));
   bound_texture.reserve_and_set(0, &buf);

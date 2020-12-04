@@ -97,26 +97,19 @@ impl<T: TextureDataType> Texture2D<T> {
     lod_count_for_axis(size.x).max(lod_count_for_axis(size.y))
   }
 
-  pub fn bind(&'_ mut self, unit_preference: Option<u32>) -> Texture2DBinding<'_, T> {
-    #[allow(clippy::or_fun_call)]
-    let unit = unit_preference.unwrap_or(self.ctx.active_texture_unit.get());
-    assert!(unit < self.ctx.capabilities().max_texture_units);
-
+  pub fn bind(&'_ mut self) -> Texture2DBinding<'_, T> {
     let binding_target = &self.ctx.bound_texture_2d;
     binding_target.on_binding_created(self.addr);
 
+    let unit = self.ctx.alloc_texture_unit();
     let different_texture_was_bound = binding_target.bound_addr() != self.addr;
-    let different_unit_was_selected = self.ctx.active_texture_unit.get() != unit;
+    let different_unit_was_selected = self.ctx.active_texture_unit() != unit;
 
+    if different_unit_was_selected {
+      unsafe { self.ctx.set_active_texture_unit(unit) };
+    }
     if different_texture_was_bound || different_unit_was_selected {
-      let gl = self.ctx.raw_gl();
-
-      if different_unit_was_selected {
-        unsafe { gl.ActiveTexture(gl::TEXTURE0 + unit as u32) };
-        self.ctx.active_texture_unit.set(unit);
-      }
-
-      binding_target.bind_unconditionally(gl, self.addr);
+      binding_target.bind_unconditionally(self.raw_gl(), self.addr);
       self.internal_state_acquired = true;
     }
     Texture2DBinding { texture: self, unit }
@@ -124,7 +117,7 @@ impl<T: TextureDataType> Texture2D<T> {
 }
 
 impl<T: TextureDataType> Drop for Texture2D<T> {
-  fn drop(&mut self) { unsafe { self.ctx.raw_gl().DeleteTextures(1, &self.addr) }; }
+  fn drop(&mut self) { unsafe { self.raw_gl().DeleteTextures(1, &self.addr) }; }
 }
 
 pub trait TextureDataType {
@@ -152,7 +145,11 @@ where
 }
 
 impl<'obj, T: TextureDataType> Drop for Texture2DBinding<'obj, T> {
-  fn drop(&mut self) { self.ctx().bound_texture_2d.on_binding_dropped(); }
+  fn drop(&mut self) {
+    let ctx = self.ctx();
+    ctx.free_texture_unit(self.unit);
+    ctx.bound_texture_2d.on_binding_dropped();
+  }
 }
 
 impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {

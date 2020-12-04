@@ -114,7 +114,7 @@ impl Program {
   pub fn bind(&'_ mut self) -> ProgramBinding<'_> {
     let binding_target = &self.ctx.bound_program;
     binding_target.on_binding_created(self.addr);
-    binding_target.bind_if_needed(self.ctx.raw_gl(), self.addr);
+    binding_target.bind_if_needed(self.raw_gl(), self.addr);
     ProgramBinding { program: self }
   }
 
