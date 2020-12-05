@@ -77,6 +77,7 @@ fn try_main() -> AnyResult<()> {
   // return image_decoding_speedrun::main();
 
   info!("{} v{} ({})", GAME_NAME, GAME_VERSION, GAME_ENGINE_NAME);
+  info!("Initiating the boot sequence...");
 
   let game_fs = GameFs::init().context("Failed to initialize GameFs")?;
 
@@ -206,6 +207,8 @@ fn try_main() -> AnyResult<()> {
     debug_vectors: Vec::new(),
   };
 
+  info!("Core subsystems have been initialized, starting the game loop...");
+  info!("Hi!");
   let result = game.start_loop();
   info!("Bye!");
   result
