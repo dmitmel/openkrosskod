@@ -194,7 +194,7 @@ impl Program {
           the uniform `{}` with the GLSL type `{}`",
           rust_type_name,
           uniform_name,
-          rust_type_name,
+          uniform_type,
         );
       }
     }
