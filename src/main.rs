@@ -539,7 +539,8 @@ impl Game {
         ball.coll.vel.y = -ball.coll.vel.y;
       }
 
-      ball.rotation += ball.rotation_speed * f32::consts::TAU * fixed_delta_time;
+      ball.rotation += ball.rotation_speed * fixed_delta_time * f32::consts::TAU;
+      ball.rotation %= f32::consts::TAU;
 
       let vel = &mut ball.coll.vel;
       let vel_magnitude = vel.magnitude();
