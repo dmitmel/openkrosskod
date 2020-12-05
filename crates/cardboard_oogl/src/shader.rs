@@ -41,10 +41,32 @@ impl Shader {
   }
 
   pub fn set_source(&self, src: &[u8]) {
+    unsafe {
+      self.raw_gl().ShaderSource(
+        self.addr,
+        1,
+        &(src.as_ptr() as *const c_char),
+        &(i32::try_from(src.len()).unwrap()),
+      );
+    }
+  }
+
+  pub fn get_source(&self) -> Vec<u8> {
     let gl = self.raw_gl();
 
-    let c_src = CString::new(src).unwrap();
-    unsafe { gl.ShaderSource(self.addr, 1, &c_src.as_ptr(), ptr::null()) };
+    let mut buf_size: i32 = 0;
+    unsafe { gl.GetShaderiv(self.addr, gl::SHADER_SOURCE_LENGTH, &mut buf_size) };
+    let mut buf: Vec<u8> = Vec::with_capacity(buf_size as usize);
+
+    if buf_size != 0 {
+      let mut text_len: i32 = 0;
+      unsafe {
+        gl.GetShaderSource(self.addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut c_char);
+        buf.set_len(text_len as usize);
+      }
+    }
+
+    buf
   }
 
   pub fn compile(&self) -> bool {
@@ -66,7 +88,7 @@ impl Shader {
     if buf_size != 0 {
       let mut text_len: i32 = 0;
       unsafe {
-        gl.GetShaderInfoLog(self.addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut i8);
+        gl.GetShaderInfoLog(self.addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut c_char);
         buf.set_len(text_len as usize);
       }
     }
@@ -92,7 +114,7 @@ impl !Send for Program {}
 impl !Sync for Program {}
 
 pub const INACTIVE_UNIFORM_LOCATION: i32 = -1;
-pub const INACTIVE_ATTRIBUTE_LOCATION: u32 = -1i32 as u32;
+pub const INACTIVE_ATTRIBUTE_LOCATION: u32 = -1_i32 as u32;
 
 impl Object for Program {
   const DEBUG_TYPE_IDENTIFIER: u32 = gl::PROGRAM;
@@ -145,7 +167,7 @@ impl Program {
     if buf_size != 0 {
       let mut text_len: i32 = 0;
       unsafe {
-        gl.GetProgramInfoLog(self.addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut i8);
+        gl.GetProgramInfoLog(self.addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut c_char);
         buf.set_len(text_len as usize);
       }
     }

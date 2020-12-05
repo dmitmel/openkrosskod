@@ -50,7 +50,7 @@ extern "system" fn internal_debug_message_callback(
   id: u32,
   severity: u32,
   length: i32,
-  message: *const i8,
+  message: *const c_char,
   _user_param: *mut c_void,
 ) {
   fn enum_to_string<T: fmt::Debug>(opt: Option<T>) -> String {
@@ -85,7 +85,7 @@ pub(crate) unsafe fn set_object_debug_label(
 
     // TODO: Check that the label doesn't contain any NUL characters
 
-    gl.ObjectLabel(type_identifier, addr, label_len, label.as_ptr() as *const i8);
+    gl.ObjectLabel(type_identifier, addr, label_len, label.as_ptr() as *const c_char);
   }
 }
 
@@ -97,9 +97,9 @@ pub(crate) unsafe fn get_object_debug_label(
   let gl = ctx.raw_gl();
   if gl.GetObjectLabel.is_loaded() {
     let buf_size =
-        // The buffer will contain a NUL-terminated string, so reserve one more
-        // byte for the final NUL character.
-        ctx.capabilities().max_debug_object_label_len.checked_add(1).unwrap();
+      // The buffer will contain a NUL-terminated string, so reserve one more
+      // byte for the final NUL character.
+      ctx.capabilities().max_debug_object_label_len.checked_add(1).unwrap();
     let mut buf: Vec<u8> = Vec::with_capacity(buf_size as usize);
     let mut text_len: i32 = 0;
 

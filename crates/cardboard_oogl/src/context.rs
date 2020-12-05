@@ -241,7 +241,7 @@ impl ContextCapabilities {
     fn get_string(gl: &RawGL, name: u32) -> String {
       let ptr: *const u8 = unsafe { gl.GetString(name) };
       assert!(!ptr.is_null());
-      let c_str = unsafe { CStr::from_ptr(ptr as *const i8) };
+      let c_str = unsafe { CStr::from_ptr(ptr as *const c_char) };
       String::from_utf8(c_str.to_bytes().to_vec()).expect("GetString returned a non-UTF8 string")
     }
 
