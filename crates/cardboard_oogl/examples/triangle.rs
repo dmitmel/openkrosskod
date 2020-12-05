@@ -62,8 +62,8 @@ fn main() {
   let fs = compile_shader(gl.share(), FS_SRC, ShaderType::Fragment);
 
   let mut program = link_program(gl.share(), &vs, &fs);
-  let attr_pos = program.get_attribute::<Vec2f>(b"a_pos");
-  let attr_color = program.get_attribute::<Colorf>(b"a_color");
+  let attr_pos = program.get_attribute::<Vec2f>("a_pos");
+  let attr_color = program.get_attribute::<Colorf>("a_color");
   let bound_program = program.bind();
 
   let mut vbo = VertexBuffer::<Vertex>::new(

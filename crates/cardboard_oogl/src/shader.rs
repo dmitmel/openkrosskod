@@ -177,18 +177,40 @@ impl Program {
     buf
   }
 
-  pub fn get_uniform<T: CorrespondingUniformType>(&self, name: &[u8]) -> Uniform<T> {
-    // TODO: extract into a different function to avoid code bloat due to
-    // monomorphization
+  pub fn get_uniform<T: CorrespondingUniformType>(&self, name: &str) -> Uniform<T> {
+    #[inline(never)]
+    #[cold]
+    #[track_caller]
+    fn check_uniform_type(
+      uniform_name: &str,
+      uniform_type: &Option<UniformType>,
+      corresponding_uniform_types: &'static [UniformTypeName],
+      rust_type_name: &'static str,
+    ) {
+      if let Some(uniform_type) = uniform_type {
+        assert!(
+          corresponding_uniform_types.contains(&uniform_type.name),
+          "mismatched uniform types: values of the Rust type `{}` are not assignable to \
+          the uniform `{}` with the GLSL type `{}`",
+          rust_type_name,
+          uniform_name,
+          rust_type_name,
+        );
+      }
+    }
+
     let location = self.get_uniform_location(name);
     let data_type = self.get_uniform_type(location);
-    if let Some(data_type) = &data_type {
-      assert!(T::CORRESPONDING_UNIFORM_TYPES.contains(&data_type.name));
-    }
+    check_uniform_type(
+      name,
+      &data_type,
+      T::CORRESPONDING_UNIFORM_TYPES,
+      std::any::type_name::<T>(),
+    );
     Uniform { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
 
-  pub fn get_uniform_location(&self, name: &[u8]) -> i32 {
+  pub fn get_uniform_location(&self, name: &str) -> i32 {
     let gl = self.raw_gl();
     let c_name = CString::new(name).unwrap();
     unsafe { gl.GetUniformLocation(self.addr, c_name.as_ptr()) }
@@ -212,8 +234,7 @@ impl Program {
         ptr::null_mut(), // name buffer
       )
     };
-    assert!(data_type > 0);
-    assert!(data_array_len > 0);
+    assert!(data_type > 0 && data_array_len > 0);
 
     if data_array_len != 1 {
       todo!("array uniforms");
@@ -226,7 +247,14 @@ impl Program {
     })
   }
 
-  pub fn get_attribute_location(&self, name: &[u8]) -> u32 {
+  pub fn get_attribute<T: CorrespondingAttributePtrType>(&self, name: &str) -> Attribute<T> {
+    let location = self.get_attribute_location(name);
+    // TODO: Add type validation for attributes as well.
+    let data_type = self.get_attribute_type(location);
+    Attribute { location, program_addr: self.addr, data_type, phantom: PhantomData }
+  }
+
+  pub fn get_attribute_location(&self, name: &str) -> u32 {
     let gl = self.raw_gl();
     let c_name = CString::new(name).unwrap();
     unsafe { gl.GetAttribLocation(self.addr, c_name.as_ptr()) as u32 }
@@ -250,8 +278,7 @@ impl Program {
         ptr::null_mut(), // name buffer
       )
     };
-    assert!(data_type > 0);
-    assert!(data_array_len > 0);
+    assert!(data_type > 0 && data_array_len > 0);
 
     if data_array_len != 1 {
       todo!("array attributes");
@@ -262,13 +289,6 @@ impl Program {
         .unwrap_or_else(|| panic!("Unknown attribute data type: 0x{:x}", data_type)),
       len: data_array_len as u32,
     })
-  }
-
-  pub fn get_attribute<T: CorrespondingAttributePtrType>(&self, name: &[u8]) -> Attribute<T> {
-    let location = self.get_attribute_location(name);
-    // TODO: Add type validation for attributes as well.
-    let data_type = self.get_attribute_type(location);
-    Attribute { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
 }
 
@@ -314,7 +334,7 @@ impl<T: CorrespondingUniformType> Uniform<T> {
   pub fn data_type(&self) -> &Option<UniformType> { &self.data_type }
 
   #[inline(always)]
-  pub fn reflect_from(program: &Program, name: &[u8]) -> Self
+  pub fn reflect_from(program: &Program, name: &str) -> Self
   where
     T: CorrespondingUniformType,
   {
@@ -402,6 +422,45 @@ impl UniformTypeName {
   }
 }
 
+impl fmt::Display for UniformType {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.name)?;
+    if self.len != 1 {
+      write!(f, "[{}]", self.len)?;
+    }
+    Ok(())
+  }
+}
+
+impl fmt::Display for UniformTypeName {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    use UniformTypeName::*;
+    write!(
+      f,
+      "{}",
+      match self {
+        Float => "float",
+        Vec2 => "vec2",
+        Vec3 => "vec3",
+        Vec4 => "vec4",
+        Int => "int",
+        IVec2 => "ivec2",
+        IVec3 => "ivec3",
+        IVec4 => "ivec4",
+        Bool => "bool",
+        BVec2 => "bvec2",
+        BVec3 => "bvec3",
+        BVec4 => "bvec4",
+        Mat2 => "mat2",
+        Mat3 => "mat3",
+        Mat4 => "mat4",
+        Sampler2D => "sampler2D",
+        SamplerCube => "samplerCube",
+      }
+    )
+  }
+}
+
 pub trait CorrespondingUniformType {
   const CORRESPONDING_UNIFORM_TYPES: &'static [UniformTypeName];
 }
@@ -428,7 +487,7 @@ impl<T: CorrespondingAttributePtrType> Attribute<T> {
   pub fn data_type(&self) -> &Option<AttributeType> { &self.data_type }
 
   #[inline(always)]
-  pub fn reflect_from(program: &Program, name: &[u8]) -> Self { program.get_attribute(name) }
+  pub fn reflect_from(program: &Program, name: &str) -> Self { program.get_attribute(name) }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
@@ -481,8 +540,7 @@ macro_rules! program_reflection_block {
     impl $struct_name {
       $struct_visibility fn new(program: &$crate::Program) -> Self {
         Self {
-          $($field_name: <$field_type>::reflect_from(
-            program, stringify!($field_name).as_bytes())),+
+          $($field_name: <$field_type>::reflect_from(program, stringify!($field_name))),+
         }
       }
     }
