@@ -288,6 +288,7 @@ pub fn load_program_asset(
   let program = link_program(globals.gl.share(), shaders)
     .with_context(|| format!("Failed to link program '{}'", name))?;
   program.set_debug_label(name.as_bytes());
+  program.load_uniform_descriptors();
   Ok(program)
 }
 

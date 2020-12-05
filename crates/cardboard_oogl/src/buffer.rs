@@ -425,7 +425,7 @@ impl<T: CorrespondingAttributePtrType> crate::Attribute<T> {
   pub fn to_pointer(&self, type_: AttributePtrType) -> AttributePtr {
     assert_eq!(type_.len, T::CORRESPONDING_ATTRIBUTE_PTR_TYPE.len);
     if let Some(data_type) = self.data_type() {
-      assert_eq!(type_.len as u32, data_type.name.components() as u32 * data_type.len);
+      assert_eq!(type_.len as u32, data_type.name.components() as u32 * data_type.array_len);
     }
     AttributePtr::new(self.location(), type_)
   }

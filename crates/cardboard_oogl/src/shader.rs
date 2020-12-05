@@ -108,6 +108,7 @@ impl Drop for Shader {
 pub struct Program {
   ctx: SharedContext,
   addr: u32,
+  uniform_descriptors: RefCell<HashMap<String, UniformDescriptor>>,
 }
 
 impl !Send for Program {}
@@ -128,9 +129,14 @@ impl Object for Program {
 }
 
 impl Program {
+  #[inline(always)]
+  pub fn uniform_descriptors(&self) -> Ref<HashMap<String, UniformDescriptor>> {
+    self.uniform_descriptors.borrow()
+  }
+
   pub fn new(ctx: SharedContext) -> Self {
     let addr = unsafe { ctx.raw_gl().CreateProgram() };
-    Self { ctx, addr }
+    Self { ctx, addr, uniform_descriptors: RefCell::new(HashMap::new()) }
   }
 
   pub fn bind(&'_ mut self) -> ProgramBinding<'_> {
@@ -177,80 +183,106 @@ impl Program {
     buf
   }
 
+  pub fn load_uniform_descriptors(&self) {
+    let gl = self.raw_gl();
+    let mut uniform_descriptors = self.uniform_descriptors.borrow_mut();
+    uniform_descriptors.clear();
+    uniform_descriptors.shrink_to_fit();
+
+    let mut active_uniforms_count: i32 = 0;
+    unsafe { gl.GetProgramiv(self.addr, gl::ACTIVE_UNIFORMS, &mut active_uniforms_count) };
+    assert!(active_uniforms_count >= 0);
+    uniform_descriptors.reserve(active_uniforms_count as usize);
+
+    let mut max_name_len: i32 = 0;
+    unsafe { gl.GetProgramiv(self.addr, gl::ACTIVE_UNIFORM_MAX_LENGTH, &mut max_name_len) };
+    assert!(max_name_len > 0);
+
+    for uniform_index in 0..active_uniforms_count {
+      let mut name_buf = Vec::<u8>::with_capacity(max_name_len as usize);
+      let mut name_len: i32 = 0;
+      let mut data_type_name: u32 = 0;
+      let mut data_array_len: i32 = 0;
+
+      unsafe {
+        self.raw_gl().GetActiveUniform(
+          self.addr,
+          uniform_index as u32,
+          max_name_len,
+          &mut name_len,
+          &mut data_array_len,
+          &mut data_type_name,
+          name_buf.as_mut_ptr() as *mut c_char,
+        );
+      }
+      assert!(name_len > 0 && data_type_name > 0 && data_array_len > 0);
+
+      unsafe { name_buf.set_len(name_len as usize) };
+
+      // NOTE: The string returned by `GetActiveUniform` is NUL-terminated in
+      // the memory (though the terminator doesn't count towards `name_len`),
+      // hence it is possible to pull off the following maneuver and skip
+      // validation by `CString`.
+      let location =
+        unsafe { gl.GetUniformLocation(self.addr, name_buf.as_ptr() as *const c_char) };
+      // Now we can safely mutate the name_buf, as the fact of its
+      // NUL-termination is now useless.
+
+      let mut name = String::from_utf8(name_buf).unwrap();
+
+      const ARRAY_NAME_MARKER: &str = "[0]";
+      let is_array = name.ends_with(ARRAY_NAME_MARKER);
+      if is_array {
+        name.truncate(name.len() - ARRAY_NAME_MARKER.len());
+      }
+
+      let data_type = UniformType {
+        name: UniformTypeName::from_raw(data_type_name).unwrap(),
+        array_len: if is_array { Some(data_array_len as u32) } else { None },
+      };
+
+      uniform_descriptors.insert(name, UniformDescriptor { location, data_type });
+    }
+  }
+
   pub fn get_uniform<T: CorrespondingUniformType>(&self, name: &str) -> Uniform<T> {
     #[inline(never)]
-    #[cold]
     #[track_caller]
     fn check_uniform_type(
-      uniform_name: &str,
-      uniform_type: &Option<UniformType>,
-      corresponding_uniform_types: &'static [UniformTypeName],
+      this: &Program,
+      name: &str,
+      corresponding_types: &'static [UniformTypeName],
       rust_type_name: &'static str,
-    ) {
-      if let Some(uniform_type) = uniform_type {
+    ) -> (i32, Option<UniformType>) {
+      if let Some(descriptor) = this.uniform_descriptors.borrow().get(name) {
+        let data_type = &descriptor.data_type;
         assert!(
-          corresponding_uniform_types.contains(&uniform_type.name),
+          corresponding_types.contains(&data_type.name),
           "mismatched uniform types: values of the Rust type `{}` are not assignable to \
           the uniform `{}` with the GLSL type `{}`",
           rust_type_name,
-          uniform_name,
-          uniform_type,
+          name,
+          data_type,
         );
+        (descriptor.location, Some(*data_type))
+      } else {
+        (INACTIVE_UNIFORM_LOCATION, None)
       }
     }
 
-    let location = self.get_uniform_location(name);
-    let data_type = self.get_uniform_type(location);
-    check_uniform_type(
-      name,
-      &data_type,
-      T::CORRESPONDING_UNIFORM_TYPES,
-      std::any::type_name::<T>(),
-    );
+    let (location, data_type) =
+      check_uniform_type(&self, name, T::CORRESPONDING_UNIFORM_TYPES, std::any::type_name::<T>());
     Uniform { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
 
   pub fn get_uniform_location(&self, name: &str) -> i32 {
-    let gl = self.raw_gl();
-    let c_name = CString::new(name).unwrap();
-    unsafe { gl.GetUniformLocation(self.addr, c_name.as_ptr()) }
-  }
-
-  pub fn get_uniform_type(&self, location: i32) -> Option<UniformType> {
-    if location == INACTIVE_UNIFORM_LOCATION {
-      return None;
-    }
-
-    let mut data_type = 0;
-    let mut data_array_len = 0;
-    unsafe {
-      self.raw_gl().GetActiveUniform(
-        self.addr,
-        location as u32,
-        0,               // name buffer size
-        ptr::null_mut(), // name length without the \0
-        &mut data_array_len,
-        &mut data_type,
-        ptr::null_mut(), // name buffer
-      )
-    };
-    assert!(data_type > 0 && data_array_len > 0);
-
-    if data_array_len != 1 {
-      todo!("array uniforms");
-    }
-
-    Some(UniformType {
-      name: UniformTypeName::from_raw(data_type)
-        .unwrap_or_else(|| panic!("Unknown uniform data type: 0x{:x}", data_type)),
-      len: data_array_len as u32,
-    })
+    self.uniform_descriptors.borrow().get(name).map_or(INACTIVE_UNIFORM_LOCATION, |d| d.location)
   }
 
   pub fn get_attribute<T: CorrespondingAttributePtrType>(&self, name: &str) -> Attribute<T> {
     let location = self.get_attribute_location(name);
     // TODO: Add type validation for attributes as well.
-    let data_type = self.get_attribute_type(location);
+    let data_type = self.get_attribute_data_type(location);
     Attribute { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
 
@@ -260,7 +292,7 @@ impl Program {
     unsafe { gl.GetAttribLocation(self.addr, c_name.as_ptr()) as u32 }
   }
 
-  pub fn get_attribute_type(&self, location: u32) -> Option<AttributeType> {
+  pub fn get_attribute_data_type(&self, location: u32) -> Option<AttributeType> {
     if location == INACTIVE_ATTRIBUTE_LOCATION {
       return None;
     }
@@ -287,7 +319,7 @@ impl Program {
     Some(AttributeType {
       name: AttributeTypeName::from_raw(data_type)
         .unwrap_or_else(|| panic!("Unknown attribute data type: 0x{:x}", data_type)),
-      len: data_array_len as u32,
+      array_len: data_array_len as u32,
     })
   }
 }
@@ -312,6 +344,12 @@ impl<'obj> Drop for ProgramBinding<'obj> {
   fn drop(&mut self) { self.ctx().bound_program.on_binding_dropped(); }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+pub struct UniformDescriptor {
+  pub location: i32,
+  pub data_type: UniformType,
+}
+
 #[derive(Debug)]
 pub struct Uniform<T: CorrespondingUniformType> {
   location: i32,
@@ -334,12 +372,7 @@ impl<T: CorrespondingUniformType> Uniform<T> {
   pub fn data_type(&self) -> &Option<UniformType> { &self.data_type }
 
   #[inline(always)]
-  pub fn reflect_from(program: &Program, name: &str) -> Self
-  where
-    T: CorrespondingUniformType,
-  {
-    program.get_uniform(name)
-  }
+  pub fn reflect_from(program: &Program, name: &str) -> Self { program.get_uniform(name) }
 }
 
 macro_rules! impl_set_uniform {
@@ -379,10 +412,15 @@ impl_set_uniform!(Vec2<bool>, [BVec2], Vec2 { x, y }, Uniform2i(x as i32, y as i
 impl_set_uniform!(Color<f32>, [Vec4], Color { r, g, b, a }, Uniform4f(r, g, b, a));
 impl_set_uniform!(crate::TextureUnit, [Sampler2D, SamplerCube], unit, Uniform1i(unit.id() as i32));
 
-#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub struct UniformType {
   pub name: UniformTypeName,
-  pub len: u32,
+  pub array_len: Option<u32>,
+}
+
+impl UniformType {
+  #[inline(always)]
+  pub fn is_array(&self) -> bool { self.array_len.is_some() }
 }
 
 gl_enum!({
@@ -425,8 +463,8 @@ impl UniformTypeName {
 impl fmt::Display for UniformType {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.name)?;
-    if self.len != 1 {
-      write!(f, "[{}]", self.len)?;
+    if let Some(array_len) = self.array_len {
+      write!(f, "[{}]", array_len)?;
     }
     Ok(())
   }
@@ -493,7 +531,7 @@ impl<T: CorrespondingAttributePtrType> Attribute<T> {
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct AttributeType {
   pub name: AttributeTypeName,
-  pub len: u32,
+  pub array_len: u32,
 }
 
 gl_enum!({
