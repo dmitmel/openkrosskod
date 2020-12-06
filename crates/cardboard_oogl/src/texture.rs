@@ -19,6 +19,7 @@ pub struct Texture2D<T: TextureDataType = u8> {
   input_format: TextureInputFormat,
   internal_format: TextureInternalFormat,
   size: Cell<Vec2u32>,
+  levels_of_detail_count: Cell<u32>,
 
   phantom: PhantomData<*mut T>,
 }
@@ -62,6 +63,7 @@ impl<T: TextureDataType> Texture2D<T> {
       internal_format: internal_format_preference
         .unwrap_or_else(|| input_format.ideal_internal_format()),
       size: Cell::new(vec2n(0)),
+      levels_of_detail_count: Cell::new(0),
 
       phantom: PhantomData,
     }
@@ -74,29 +76,7 @@ impl<T: TextureDataType> Texture2D<T> {
     vec2((size.x >> level_of_detail).max(1), (size.y >> level_of_detail).max(1))
   }
 
-  pub fn levels_of_detail_count(&self) -> u32 {
-    /// Essentially returns the value of `floor(log2(max(n, 1))) + 1` where `n`
-    /// is a positive integer. Explanation as for why this exact expression is
-    /// used:
-    ///
-    /// `floor(log2(m))` can be interpreted as the number of times `m` has to
-    /// be bitshifted to the right to get 1, in other words to get to the
-    /// minimum level of detail on this axis (see also
-    /// `size_at_level_of_detail`). A maximum value with 1 is taken because the
-    /// result of `0.leading_zeros()` is undefined, as are the logarithms of
-    /// non-positive numbers. This is however done as a sanity check because
-    /// the texture size can be zero only if it wasn't set with `set_size`
-    /// before (`set_size` doesn't allow zero sizes on any axis). Finally, we
-    /// add 1 to include the default level of detail, i.e. level 0.
-    fn lod_count_for_axis(n: u32) -> u32 {
-      // <https://users.rust-lang.org/t/logarithm-of-integers/8506/5>
-      // <https://github.com/rust-lang/rust/pull/70835/files#diff-8b5d068f3b1614f253a7bf9920ad9e8528eb6d623b57b69b09c90799cebaf9b1R4358>
-      (1u32.leading_zeros() - n.max(1).leading_zeros()) + 1
-    }
-
-    let size = self.size();
-    lod_count_for_axis(size.x).max(lod_count_for_axis(size.y))
-  }
+  pub fn levels_of_detail_count(&self) -> u32 { self.levels_of_detail_count.get() }
 
   pub fn bind(&'_ mut self, unit: &TextureUnit) -> Texture2DBinding<'_, T> {
     let binding_target = &self.ctx.bound_texture_2d;
@@ -155,11 +135,36 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
 
   pub fn set_size(&self, size: Vec2u32) {
     let max_size = self.ctx().capabilities().max_texture_size;
+    // index out of bounds: the len is 3 but the index is 4
     assert!(size.x > 0);
     assert!(size.y > 0);
     assert!(size.x <= max_size);
     assert!(size.y <= max_size);
     self.texture.size.set(size);
+
+    // LOD count needs to be calculated only for the max dimension because the
+    // max dimension will always have the max LOD count. Otherwise we have to
+    // calculate the LOD count for each dimension and take the max value
+    // between those two.
+    let max_dimension = (size.x).max(size.y);
+    // The following expression essentially computes the value of
+    // `floor(log2(max(n, 1))) + 1` where `n` is a positive integer.
+    // Explanation as for why this exact expression is used:
+    //
+    // `floor(log2(m))` can be interpreted as the number of times `m` has to be
+    // divided by two to get 1, in other words bitshifted to the right to get
+    // 1, in other words to get to the minimum level of detail on this axis
+    // (see also `size_at_level_of_detail`). A maximum value with 1 is taken
+    // because the result of `0.leading_zeros()` is undefined, as are the
+    // logarithms of non-positive numbers. This is however done as a sanity
+    // check because the texture size can be zero only if it wasn't set with
+    // `set_size` before (`set_size` doesn't allow zero sizes on any axis).
+    // Finally, we add 1 to include the default level of detail, i.e. level 0.
+    //
+    // <https://users.rust-lang.org/t/logarithm-of-integers/8506/5>
+    // <https://github.com/rust-lang/rust/pull/70835/files#diff-8b5d068f3b1614f253a7bf9920ad9e8528eb6d623b57b69b09c90799cebaf9b1R4358>
+    let lod_count = (1u32.leading_zeros() - max_dimension.max(1).leading_zeros()) + 1;
+    self.texture.levels_of_detail_count.set(lod_count)
   }
 
   pub fn generate_mipmap(&self) {
