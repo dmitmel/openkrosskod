@@ -12,7 +12,7 @@ gl_enum!({
 });
 
 #[derive(Debug)]
-pub struct VertexBuffer<T> {
+pub struct VertexBuffer<T: Copy> {
   ctx: SharedContext,
   addr: u32,
   internal_state_acquired: bool,
@@ -27,7 +27,7 @@ pub struct VertexBuffer<T> {
 impl<T> !Send for VertexBuffer<T> {}
 impl<T> !Sync for VertexBuffer<T> {}
 
-impl<T> Object for VertexBuffer<T> {
+unsafe impl<T: Copy> Object for VertexBuffer<T> {
   const DEBUG_TYPE_IDENTIFIER: u32 = gl::BUFFER;
 
   #[inline(always)]
@@ -38,7 +38,7 @@ impl<T> Object for VertexBuffer<T> {
   fn internal_state_acquired(&self) -> bool { self.internal_state_acquired }
 }
 
-impl<T> VertexBuffer<T> {
+impl<T: Copy> VertexBuffer<T> {
   #[inline(always)]
   pub fn attributes(&self) -> &[AttributePtr] { &self.attributes }
   #[inline(always)]
@@ -78,16 +78,19 @@ impl<T> VertexBuffer<T> {
   }
 }
 
-impl<T> Drop for VertexBuffer<T> {
+impl<T: Copy> Drop for VertexBuffer<T> {
   fn drop(&mut self) { unsafe { self.raw_gl().DeleteBuffers(1, &self.addr) }; }
 }
 
 #[derive(Debug)]
-pub struct VertexBufferBinding<'obj, T> {
+pub struct VertexBufferBinding<'obj, T: Copy> {
   buffer: &'obj mut VertexBuffer<T>,
 }
 
-impl<'obj, T> ObjectBinding<'obj, VertexBuffer<T>> for VertexBufferBinding<'obj, T> {
+unsafe impl<'obj, T> ObjectBinding<'obj, VertexBuffer<T>> for VertexBufferBinding<'obj, T>
+where
+  T: Copy,
+{
   #[inline(always)]
   fn object(&self) -> &VertexBuffer<T> { &self.buffer }
 
@@ -96,11 +99,11 @@ impl<'obj, T> ObjectBinding<'obj, VertexBuffer<T>> for VertexBufferBinding<'obj,
   }
 }
 
-impl<'obj, T> Drop for VertexBufferBinding<'obj, T> {
+impl<'obj, T: Copy> Drop for VertexBufferBinding<'obj, T> {
   fn drop(&mut self) { self.ctx().bound_vertex_buffer.on_binding_dropped(); }
 }
 
-impl<'obj, T> VertexBufferBinding<'obj, T> {
+impl<'obj, T: Copy> VertexBufferBinding<'obj, T> {
   pub fn configure_attributes(&self) {
     let gl = self.raw_gl();
     let attributes = &self.buffer.attributes;
@@ -160,7 +163,7 @@ pub struct ElementBuffer<T: BufferIndex> {
 impl<T: BufferIndex> !Send for ElementBuffer<T> {}
 impl<T: BufferIndex> !Sync for ElementBuffer<T> {}
 
-impl<T: BufferIndex> Object for ElementBuffer<T> {
+unsafe impl<T: BufferIndex> Object for ElementBuffer<T> {
   const DEBUG_TYPE_IDENTIFIER: u32 = gl::BUFFER;
 
   #[inline(always)]
@@ -196,7 +199,7 @@ pub struct ElementBufferBinding<'obj, T: BufferIndex> {
   buffer: &'obj mut ElementBuffer<T>,
 }
 
-impl<'obj, T> ObjectBinding<'obj, ElementBuffer<T>> for ElementBufferBinding<'obj, T>
+unsafe impl<'obj, T> ObjectBinding<'obj, ElementBuffer<T>> for ElementBufferBinding<'obj, T>
 where
   T: BufferIndex,
 {
@@ -232,7 +235,7 @@ gl_enum!({
   }
 });
 
-pub trait BufferIndex {
+pub trait BufferIndex: Copy {
   const GL_DRAW_ELEMENTS_TYPE: DrawElementsType;
 }
 
@@ -251,7 +254,7 @@ gl_enum!({
   }
 });
 
-pub trait Buffer<T>: Object {
+pub unsafe trait Buffer<T>: Object {
   fn len(&self) -> usize;
   #[inline(always)]
   fn is_empty(&self) -> bool { self.len() == 0 }
@@ -259,23 +262,24 @@ pub trait Buffer<T>: Object {
   unsafe fn __impl_set_len(&self, len: usize);
 }
 
-impl<T> Buffer<T> for VertexBuffer<T> {
+unsafe impl<T: Copy> Buffer<T> for VertexBuffer<T> {
   #[inline(always)]
   fn len(&self) -> usize { self.len.get() }
   #[inline(always)]
   unsafe fn __impl_set_len(&self, len: usize) { self.len.set(len) }
 }
 
-impl<T: BufferIndex> Buffer<T> for ElementBuffer<T> {
+unsafe impl<T: BufferIndex> Buffer<T> for ElementBuffer<T> {
   #[inline(always)]
   fn len(&self) -> usize { self.len.get() }
   #[inline(always)]
   unsafe fn __impl_set_len(&self, len: usize) { self.len.set(len) }
 }
 
-pub trait BufferBinding<'obj, Obj: 'obj, T>: ObjectBinding<'obj, Obj>
+pub unsafe trait BufferBinding<'obj, Obj: 'obj, T>: ObjectBinding<'obj, Obj>
 where
   Obj: Buffer<T>,
+  T: Copy,
 {
   const BIND_TARGET: BindBufferTarget;
 
@@ -332,20 +336,25 @@ where
   }
 }
 
-impl<'obj, T> BufferBinding<'obj, VertexBuffer<T>, T> for VertexBufferBinding<'obj, T> {
+unsafe impl<'obj, T> BufferBinding<'obj, VertexBuffer<T>, T> for VertexBufferBinding<'obj, T>
+where
+  T: Copy,
+{
   const BIND_TARGET: BindBufferTarget = BindBufferTarget::Vertex;
 }
 
-impl<'obj, T> BufferBinding<'obj, ElementBuffer<T>, T> for ElementBufferBinding<'obj, T>
+unsafe impl<'obj, T> BufferBinding<'obj, ElementBuffer<T>, T> for ElementBufferBinding<'obj, T>
 where
   T: BufferIndex,
 {
   const BIND_TARGET: BindBufferTarget = BindBufferTarget::Element;
 }
 
-pub trait DrawableBufferBinding<'obj, Obj: 'obj, T>: BufferBinding<'obj, Obj, T>
+pub unsafe trait DrawableBufferBinding<'obj, Obj: 'obj, T>:
+  BufferBinding<'obj, Obj, T>
 where
   Obj: Buffer<T>,
+  T: Copy,
 {
   fn draw(&'obj self, _program_binding: &crate::ProgramBinding, mode: DrawPrimitive) {
     unsafe { self.__impl_draw(mode, 0, self.len()) }
@@ -366,7 +375,11 @@ where
   unsafe fn __impl_draw(&'obj self, mode: DrawPrimitive, start: usize, count: usize);
 }
 
-impl<'obj, T> DrawableBufferBinding<'obj, VertexBuffer<T>, T> for VertexBufferBinding<'obj, T> {
+unsafe impl<'obj, T> DrawableBufferBinding<'obj, VertexBuffer<T>, T>
+  for VertexBufferBinding<'obj, T>
+where
+  T: Copy,
+{
   unsafe fn __impl_draw(&'obj self, mode: DrawPrimitive, start: usize, count: usize) {
     self.raw_gl().DrawArrays(
       mode.as_raw(),
@@ -376,7 +389,8 @@ impl<'obj, T> DrawableBufferBinding<'obj, VertexBuffer<T>, T> for VertexBufferBi
   }
 }
 
-impl<'obj, T> DrawableBufferBinding<'obj, ElementBuffer<T>, T> for ElementBufferBinding<'obj, T>
+unsafe impl<'obj, T> DrawableBufferBinding<'obj, ElementBuffer<T>, T>
+  for ElementBufferBinding<'obj, T>
 where
   T: BufferIndex,
 {

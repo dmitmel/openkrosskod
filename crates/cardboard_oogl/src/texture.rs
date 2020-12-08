@@ -27,7 +27,7 @@ pub struct Texture2D<T: TextureDataType = u8> {
 impl<T: TextureDataType> !Send for Texture2D<T> {}
 impl<T: TextureDataType> !Sync for Texture2D<T> {}
 
-impl<T: TextureDataType> Object for Texture2D<T> {
+unsafe impl<T: TextureDataType> Object for Texture2D<T> {
   const DEBUG_TYPE_IDENTIFIER: u32 = gl::TEXTURE;
 
   #[inline(always)]
@@ -100,7 +100,7 @@ impl<T: TextureDataType> Drop for Texture2D<T> {
   fn drop(&mut self) { unsafe { self.raw_gl().DeleteTextures(1, &self.addr) }; }
 }
 
-pub trait TextureDataType {
+pub trait TextureDataType: Copy {
   const GL_TEXTURE_INPUT_DATA_TYPE: TextureInputDataType;
 }
 
@@ -113,7 +113,7 @@ pub struct Texture2DBinding<'obj, T: TextureDataType = u8> {
   texture: &'obj mut Texture2D<T>,
 }
 
-impl<'obj, T> ObjectBinding<'obj, Texture2D<T>> for Texture2DBinding<'obj, T>
+unsafe impl<'obj, T> ObjectBinding<'obj, Texture2D<T>> for Texture2DBinding<'obj, T>
 where
   T: TextureDataType,
 {
@@ -129,9 +129,6 @@ impl<'obj, T: TextureDataType> Drop for Texture2DBinding<'obj, T> {
 
 impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
   pub const BIND_TARGET: BindTextureTarget = Texture2D::<T>::BIND_TARGET;
-
-  #[inline(always)]
-  pub fn size(&self) -> Vec2u32 { self.texture.size() }
 
   pub fn set_size(&self, size: Vec2u32) {
     let max_size = self.ctx().capabilities().max_texture_size;
@@ -348,7 +345,7 @@ gl_enum!({
   }
 });
 
-pub trait Texture<T: TextureDataType = u8>: Object {
+pub unsafe trait Texture<T: TextureDataType = u8>: Object {
   fn size(&self) -> Vec2u32;
   #[inline(always)]
   fn is_empty(&self) -> bool {
@@ -357,12 +354,12 @@ pub trait Texture<T: TextureDataType = u8>: Object {
   }
 }
 
-impl<T: TextureDataType> Texture<T> for Texture2D<T> {
+unsafe impl<T: TextureDataType> Texture<T> for Texture2D<T> {
   #[inline(always)]
   fn size(&self) -> Vec2u32 { self.size.get() }
 }
 
-pub trait TextureBinding<'obj, Obj: 'obj, T>: ObjectBinding<'obj, Obj>
+pub unsafe trait TextureBinding<'obj, Obj: 'obj, T>: ObjectBinding<'obj, Obj>
 where
   Obj: Texture<T>,
   T: TextureDataType,
@@ -373,4 +370,11 @@ where
   fn size(&'obj self) -> Vec2u32 { self.object().size() }
   #[inline(always)]
   fn is_empty(&'obj self) -> bool { self.object().is_empty() }
+}
+
+unsafe impl<'obj, T> TextureBinding<'obj, Texture2D<T>, T> for Texture2DBinding<'obj, T>
+where
+  T: TextureDataType,
+{
+  const BIND_TARGET: BindTextureTarget = BindTextureTarget::Texture2D;
 }

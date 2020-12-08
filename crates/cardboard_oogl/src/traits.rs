@@ -4,7 +4,7 @@ use prelude_plus::*;
 
 pub use crate::{Buffer, BufferBinding, DrawableBufferBinding, Texture, TextureBinding};
 
-pub trait Object {
+pub unsafe trait Object {
   const DEBUG_TYPE_IDENTIFIER: u32;
 
   fn ctx(&self) -> &SharedContext;
@@ -27,7 +27,7 @@ pub trait Object {
 }
 
 // Not quite sure about how lifetimes work in this case
-pub trait ObjectBinding<'obj, Obj: 'obj>
+pub unsafe trait ObjectBinding<'obj, Obj: 'obj>
 where
   Obj: Object,
 {

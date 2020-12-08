@@ -17,7 +17,7 @@ pub struct Framebuffer {
 impl !Send for Framebuffer {}
 impl !Sync for Framebuffer {}
 
-impl Object for Framebuffer {
+unsafe impl Object for Framebuffer {
   const DEBUG_TYPE_IDENTIFIER: u32 = gl::FRAMEBUFFER;
 
   #[inline(always)]
@@ -55,7 +55,7 @@ pub struct FramebufferBinding<'obj> {
   framebuffer: &'obj mut Framebuffer,
 }
 
-impl<'obj> ObjectBinding<'obj, Framebuffer> for FramebufferBinding<'obj> {
+unsafe impl<'obj> ObjectBinding<'obj, Framebuffer> for FramebufferBinding<'obj> {
   #[inline(always)]
   fn object(&self) -> &Framebuffer { &self.framebuffer }
 

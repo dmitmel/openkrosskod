@@ -20,7 +20,7 @@ pub struct Shader {
 impl !Send for Shader {}
 impl !Sync for Shader {}
 
-impl Object for Shader {
+unsafe impl Object for Shader {
   const DEBUG_TYPE_IDENTIFIER: u32 = gl::SHADER;
 
   #[inline(always)]
@@ -117,7 +117,7 @@ impl !Sync for Program {}
 pub const INACTIVE_UNIFORM_LOCATION: i32 = -1;
 pub const INACTIVE_ATTRIBUTE_LOCATION: u32 = -1_i32 as u32;
 
-impl Object for Program {
+unsafe impl Object for Program {
   const DEBUG_TYPE_IDENTIFIER: u32 = gl::PROGRAM;
 
   #[inline(always)]
@@ -333,7 +333,7 @@ pub struct ProgramBinding<'obj> {
   program: &'obj mut Program,
 }
 
-impl<'obj> ObjectBinding<'obj, Program> for ProgramBinding<'obj> {
+unsafe impl<'obj> ObjectBinding<'obj, Program> for ProgramBinding<'obj> {
   #[inline(always)]
   fn object(&self) -> &Program { &self.program }
 
