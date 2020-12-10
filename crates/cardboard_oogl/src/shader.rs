@@ -1,5 +1,5 @@
 use crate::impl_prelude::*;
-use crate::CorrespondingAttributePtrType;
+use crate::CorrespondingAttribPtrType;
 use cardboard_math::*;
 use prelude_plus::*;
 
@@ -115,7 +115,7 @@ impl !Send for Program {}
 impl !Sync for Program {}
 
 pub const INACTIVE_UNIFORM_LOCATION: i32 = -1;
-pub const INACTIVE_ATTRIBUTE_LOCATION: u32 = -1_i32 as u32;
+pub const INACTIVE_ATTRIB_LOCATION: u32 = -1_i32 as u32;
 
 unsafe impl Object for Program {
   const DEBUG_TYPE_IDENTIFIER: u32 = gl::PROGRAM;
@@ -279,21 +279,21 @@ impl Program {
     self.uniform_descriptors.borrow().get(name).map_or(INACTIVE_UNIFORM_LOCATION, |d| d.location)
   }
 
-  pub fn get_attribute<T: CorrespondingAttributePtrType>(&self, name: &str) -> Attribute<T> {
-    let location = self.get_attribute_location(name);
+  pub fn get_attrib<T: CorrespondingAttribPtrType>(&self, name: &str) -> Attrib<T> {
+    let location = self.get_attrib_location(name);
     // TODO: Add type validation for attributes as well.
-    let data_type = self.get_attribute_data_type(location);
-    Attribute { location, program_addr: self.addr, data_type, phantom: PhantomData }
+    let data_type = self.get_attrib_data_type(location);
+    Attrib { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
 
-  pub fn get_attribute_location(&self, name: &str) -> u32 {
+  pub fn get_attrib_location(&self, name: &str) -> u32 {
     let gl = self.raw_gl();
     let c_name = CString::new(name).unwrap();
     unsafe { gl.GetAttribLocation(self.addr, c_name.as_ptr()) as u32 }
   }
 
-  pub fn get_attribute_data_type(&self, location: u32) -> Option<AttributeType> {
-    if location == INACTIVE_ATTRIBUTE_LOCATION {
+  pub fn get_attrib_data_type(&self, location: u32) -> Option<AttribType> {
+    if location == INACTIVE_ATTRIB_LOCATION {
       return None;
     }
 
@@ -316,8 +316,8 @@ impl Program {
       todo!("array attributes");
     }
 
-    Some(AttributeType {
-      name: AttributeTypeName::from_raw_unwrap(data_type),
+    Some(AttribType {
+      name: AttribTypeName::from_raw_unwrap(data_type),
       array_len: data_array_len as u32,
     })
   }
@@ -503,38 +503,38 @@ pub trait CorrespondingUniformType {
 }
 
 #[derive(Debug)]
-pub struct Attribute<T: CorrespondingAttributePtrType> {
+pub struct Attrib<T: CorrespondingAttribPtrType> {
   location: u32,
   program_addr: u32,
-  data_type: Option<AttributeType>,
+  data_type: Option<AttribType>,
   phantom: PhantomData<*mut T>,
 }
 
-impl<T> !Send for Attribute<T> {}
-impl<T> !Sync for Attribute<T> {}
+impl<T> !Send for Attrib<T> {}
+impl<T> !Sync for Attrib<T> {}
 
-impl<T: CorrespondingAttributePtrType> Attribute<T> {
+impl<T: CorrespondingAttribPtrType> Attrib<T> {
   #[inline(always)]
   pub fn location(&self) -> u32 { self.location }
   #[inline(always)]
-  pub fn is_active(&self) -> bool { self.location != INACTIVE_ATTRIBUTE_LOCATION }
+  pub fn is_active(&self) -> bool { self.location != INACTIVE_ATTRIB_LOCATION }
   #[inline(always)]
   pub fn program_addr(&self) -> u32 { self.program_addr }
   #[inline(always)]
-  pub fn data_type(&self) -> &Option<AttributeType> { &self.data_type }
+  pub fn data_type(&self) -> &Option<AttribType> { &self.data_type }
 
   #[inline(always)]
-  pub fn reflect_from(program: &Program, name: &str) -> Self { program.get_attribute(name) }
+  pub fn reflect_from(program: &Program, name: &str) -> Self { program.get_attrib(name) }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
-pub struct AttributeType {
-  pub name: AttributeTypeName,
+pub struct AttribType {
+  pub name: AttribTypeName,
   pub array_len: u32,
 }
 
 gl_enum!({
-  pub enum AttributeTypeName {
+  pub enum AttribTypeName {
     Float = FLOAT,
     Vec2 = FLOAT_VEC2,
     Vec3 = FLOAT_VEC3,
@@ -545,7 +545,7 @@ gl_enum!({
   }
 });
 
-impl AttributeTypeName {
+impl AttribTypeName {
   pub fn components(&self) -> u8 {
     match self {
       Self::Float => 1,

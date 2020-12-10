@@ -56,8 +56,8 @@ impl Renderer {
       globals.gl.share(),
       // this attribute pointer will be the same for both programs because both
       // use the same vertex shader, as such the VBO can be shared
-      vec![rectangle_program_reflection.a_pos.to_pointer(oogl::AttributePtrType {
-        name: oogl::AttributePtrTypeName::I8,
+      vec![rectangle_program_reflection.a_pos.to_pointer(oogl::AttribPtrType {
+        name: oogl::AttribPtrTypeName::I8,
         len: 2,
         normalize: false,
       })],
@@ -66,8 +66,8 @@ impl Renderer {
     {
       let bound_vbo = vbo.bind();
       bound_vbo.object().set_debug_label(b"vbo");
-      bound_vbo.enable_attributes();
-      bound_vbo.configure_attributes();
+      bound_vbo.enable_attribs();
+      bound_vbo.configure_attribs();
       bound_vbo
         .reserve_and_set(oogl::BufferUsageHint::StaticDraw, &[[-1, -1], [-1, 1], [1, 1], [1, -1]]);
     }
@@ -196,7 +196,7 @@ impl Renderer {
 oogl::program_reflection_block!({
   #[derive(Debug)]
   struct RendererProgramReflection {
-    a_pos: oogl::Attribute<Vec2f>,
+    a_pos: oogl::Attrib<Vec2f>,
     u_window_size: oogl::Uniform<Vec2f>,
     u_pos: oogl::Uniform<Vec2f>,
     u_size: oogl::Uniform<Vec2f>,

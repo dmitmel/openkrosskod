@@ -17,7 +17,7 @@ pub struct VertexBuffer<T: Copy> {
   addr: u32,
   internal_state_acquired: bool,
 
-  attributes: Vec<AttributePtr>,
+  attribs: Vec<AttribPtr>,
   stride: u32,
   len: Cell<usize>,
 
@@ -40,13 +40,13 @@ unsafe impl<T: Copy> Object for VertexBuffer<T> {
 
 impl<T: Copy> VertexBuffer<T> {
   #[inline(always)]
-  pub fn attributes(&self) -> &[AttributePtr] { &self.attributes }
+  pub fn attribs(&self) -> &[AttribPtr] { &self.attribs }
   #[inline(always)]
   pub fn stride(&self) -> u32 { self.stride }
 
-  pub fn new(ctx: SharedContext, attributes: Vec<AttributePtr>) -> Self {
+  pub fn new(ctx: SharedContext, attribs: Vec<AttribPtr>) -> Self {
     let mut stride = 0;
-    for attrib in &attributes {
+    for attrib in &attribs {
       assert!(1 <= attrib.type_.len && attrib.type_.len <= 4);
       stride += attrib.size as u32;
     }
@@ -61,7 +61,7 @@ impl<T: Copy> VertexBuffer<T> {
       addr,
       internal_state_acquired: false,
 
-      attributes,
+      attribs,
       stride,
       len: Cell::new(0),
 
@@ -104,13 +104,13 @@ impl<'obj, T: Copy> Drop for VertexBufferBinding<'obj, T> {
 }
 
 impl<'obj, T: Copy> VertexBufferBinding<'obj, T> {
-  pub fn configure_attributes(&self) {
+  pub fn configure_attribs(&self) {
     let gl = self.raw_gl();
-    let attributes = &self.buffer.attributes;
+    let attribs = &self.buffer.attribs;
     let stride = self.buffer.stride;
 
     let mut offset = 0;
-    for attrib in attributes {
+    for attrib in attribs {
       if attrib.is_active() {
         unsafe {
           gl.VertexAttribPointer(
@@ -128,20 +128,20 @@ impl<'obj, T: Copy> VertexBufferBinding<'obj, T> {
   }
 
   // https://stackoverflow.com/q/39264296/12005228
-  pub fn enable_attributes(&self) {
+  pub fn enable_attribs(&self) {
     let gl = self.raw_gl();
-    let attributes = &self.buffer.attributes;
-    for attrib in attributes {
+    let attribs = &self.buffer.attribs;
+    for attrib in attribs {
       if attrib.is_active() {
         unsafe { gl.EnableVertexAttribArray(attrib.location as u32) };
       }
     }
   }
 
-  pub fn disable_attributes(&self) {
+  pub fn disable_attribs(&self) {
     let gl = self.raw_gl();
-    let attributes = &self.buffer.attributes;
-    for attrib in attributes {
+    let attribs = &self.buffer.attribs;
+    for attrib in attribs {
       if attrib.is_active() {
         unsafe { gl.DisableVertexAttribArray(attrib.location as u32) };
       }
@@ -405,52 +405,52 @@ where
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
-pub struct AttributePtrType {
-  pub name: AttributePtrTypeName,
+pub struct AttribPtrType {
+  pub name: AttribPtrTypeName,
   pub len: u32,
   pub normalize: bool,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
-pub struct AttributePtr {
+pub struct AttribPtr {
   location: u32,
-  type_: AttributePtrType,
+  type_: AttribPtrType,
   size: u32,
 }
 
-impl AttributePtr {
+impl AttribPtr {
   #[inline(always)]
   pub fn location(&self) -> u32 { self.location }
   #[inline(always)]
-  pub fn is_active(&self) -> bool { self.location != crate::INACTIVE_ATTRIBUTE_LOCATION }
+  pub fn is_active(&self) -> bool { self.location != crate::INACTIVE_ATTRIB_LOCATION }
   #[inline(always)]
-  pub fn type_(&self) -> &AttributePtrType { &self.type_ }
+  pub fn type_(&self) -> &AttribPtrType { &self.type_ }
   #[inline(always)]
   pub fn size(&self) -> u32 { self.size }
 
-  pub fn new(location: u32, type_: AttributePtrType) -> Self {
+  pub fn new(location: u32, type_: AttribPtrType) -> Self {
     assert!(type_.len > 0);
     let size = type_.name.size() as u32 * type_.len;
     Self { location, type_, size }
   }
 }
 
-impl<T: CorrespondingAttributePtrType> crate::Attribute<T> {
-  pub fn to_pointer(&self, type_: AttributePtrType) -> AttributePtr {
-    assert_eq!(type_.len, T::CORRESPONDING_ATTRIBUTE_PTR_TYPE.len);
+impl<T: CorrespondingAttribPtrType> crate::Attrib<T> {
+  pub fn to_pointer(&self, type_: AttribPtrType) -> AttribPtr {
+    assert_eq!(type_.len, T::CORRESPONDING_ATTRIB_PTR_TYPE.len);
     if let Some(data_type) = self.data_type() {
       assert_eq!(type_.len as u32, data_type.name.components() as u32 * data_type.array_len);
     }
-    AttributePtr::new(self.location(), type_)
+    AttribPtr::new(self.location(), type_)
   }
 
-  pub fn to_pointer_simple(&self) -> AttributePtr {
-    self.to_pointer(T::CORRESPONDING_ATTRIBUTE_PTR_TYPE)
+  pub fn to_pointer_simple(&self) -> AttribPtr {
+    self.to_pointer(T::CORRESPONDING_ATTRIB_PTR_TYPE)
   }
 }
 
 gl_enum!({
-  pub enum AttributePtrTypeName {
+  pub enum AttribPtrTypeName {
     I8 = BYTE,
     U8 = UNSIGNED_BYTE,
     I16 = SHORT,
@@ -460,7 +460,7 @@ gl_enum!({
   }
 });
 
-impl AttributePtrTypeName {
+impl AttribPtrTypeName {
   pub fn size(&self) -> u8 {
     use mem::size_of;
     let size: usize = match self {
@@ -476,15 +476,15 @@ impl AttributePtrTypeName {
   }
 }
 
-pub trait CorrespondingAttributePtrType {
-  const CORRESPONDING_ATTRIBUTE_PTR_TYPE: AttributePtrType;
+pub trait CorrespondingAttribPtrType {
+  const CORRESPONDING_ATTRIB_PTR_TYPE: AttribPtrType;
 }
 
 macro_rules! impl_attr_type {
   ($data_type:ty, ($corresponding_type_name:ident, $corresponding_type_len:literal)) => {
-    impl CorrespondingAttributePtrType for $data_type {
-      const CORRESPONDING_ATTRIBUTE_PTR_TYPE: AttributePtrType = AttributePtrType {
-        name: AttributePtrTypeName::$corresponding_type_name,
+    impl CorrespondingAttribPtrType for $data_type {
+      const CORRESPONDING_ATTRIB_PTR_TYPE: AttribPtrType = AttribPtrType {
+        name: AttribPtrTypeName::$corresponding_type_name,
         len: $corresponding_type_len,
         normalize: false,
       };

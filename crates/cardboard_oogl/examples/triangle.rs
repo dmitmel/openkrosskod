@@ -62,8 +62,8 @@ fn main() {
   let fs = compile_shader(gl.share(), FS_SRC, ShaderType::Fragment);
 
   let mut program = link_program(gl.share(), &vs, &fs);
-  let attr_pos = program.get_attribute::<Vec2f>("a_pos");
-  let attr_color = program.get_attribute::<Colorf>("a_color");
+  let attr_pos = program.get_attrib::<Vec2f>("a_pos");
+  let attr_color = program.get_attrib::<Colorf>("a_color");
   let bound_program = program.bind();
 
   let mut vbo = VertexBuffer::<Vertex>::new(
@@ -72,8 +72,8 @@ fn main() {
   );
 
   let bound_vbo = vbo.bind();
-  bound_vbo.enable_attributes();
-  bound_vbo.configure_attributes();
+  bound_vbo.enable_attribs();
+  bound_vbo.configure_attribs();
   bound_vbo.reserve_and_set(BufferUsageHint::StaticDraw, &VERTEX_DATA);
 
   gl.set_clear_color(color(0.0, 0.0, 0.0, 1.0));
