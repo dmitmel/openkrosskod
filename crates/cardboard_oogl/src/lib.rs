@@ -2,6 +2,14 @@
 #![deny(missing_debug_implementations)]
 #![allow(clippy::missing_safety_doc)]
 
+#[doc(hidden)]
+#[inline(never)]
+#[cold]
+#[track_caller]
+pub fn _gl_enum_unknown_raw_value_fail(name: &'static str, raw: ::gl::types::GLenum) -> ! {
+  panic!("unknown raw value for enum {}: 0x{:08x}", name, raw)
+}
+
 macro_rules! gl_enum {
   // a wrapper for autoformatting purposes
   ({$($tt:tt)+}) => { gl_enum! { $($tt)+ } };
@@ -27,6 +35,12 @@ macro_rules! gl_enum {
           $(::gl::$gl_variant => Self::$rust_variant,)+
             _ => return None,
         })
+      }
+
+      #[inline]
+      $visibility fn from_raw_unwrap(raw: ::gl::types::GLenum) -> Self {
+        Self::from_raw(raw)
+          .unwrap_or_else(|| $crate::_gl_enum_unknown_raw_value_fail(stringify!($enum_name), raw))
       }
 
       #[inline(always)]

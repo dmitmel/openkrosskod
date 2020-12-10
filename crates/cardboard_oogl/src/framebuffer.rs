@@ -72,10 +72,9 @@ impl<'obj> FramebufferBinding<'obj> {
   pub const BIND_TARGET: BindFramebufferTarget = Framebuffer::BIND_TARGET;
 
   pub fn status(&self) -> FramebufferStatus {
-    FramebufferStatus::from_raw(unsafe {
+    FramebufferStatus::from_raw_unwrap(unsafe {
       self.raw_gl().CheckFramebufferStatus(Self::BIND_TARGET.as_raw())
     })
-    .unwrap()
   }
 }
 

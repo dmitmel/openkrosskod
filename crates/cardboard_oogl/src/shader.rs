@@ -237,7 +237,7 @@ impl Program {
       }
 
       let data_type = UniformType {
-        name: UniformTypeName::from_raw(data_type_name).unwrap(),
+        name: UniformTypeName::from_raw_unwrap(data_type_name),
         array_len: if is_array { Some(data_array_len as u32) } else { None },
       };
 
@@ -317,8 +317,7 @@ impl Program {
     }
 
     Some(AttributeType {
-      name: AttributeTypeName::from_raw(data_type)
-        .unwrap_or_else(|| panic!("Unknown attribute data type: 0x{:x}", data_type)),
+      name: AttributeTypeName::from_raw_unwrap(data_type),
       array_len: data_array_len as u32,
     })
   }
