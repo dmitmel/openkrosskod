@@ -439,7 +439,10 @@ impl<T: CorrespondingAttribPtrType> crate::Attrib<T> {
   pub fn to_pointer(&self, type_: AttribPtrType) -> AttribPtr {
     assert_eq!(type_.len, T::CORRESPONDING_ATTRIB_PTR_TYPE.len);
     if let Some(data_type) = self.data_type() {
-      assert_eq!(type_.len as u32, data_type.name.components() as u32 * data_type.array_len);
+      assert_eq!(
+        type_.len as u32,
+        data_type.name.components() as u32 * data_type.array_len.unwrap_or(1)
+      );
     }
     AttribPtr::new(self.location(), type_)
   }
@@ -476,11 +479,11 @@ impl AttribPtrTypeName {
   }
 }
 
-pub trait CorrespondingAttribPtrType {
+pub trait CorrespondingAttribPtrType: crate::CorrespondingAttribType {
   const CORRESPONDING_ATTRIB_PTR_TYPE: AttribPtrType;
 }
 
-macro_rules! impl_attr_type {
+macro_rules! impl_attrib_ptr_type {
   ($data_type:ty, ($corresponding_type_name:ident, $corresponding_type_len:literal)) => {
     impl CorrespondingAttribPtrType for $data_type {
       const CORRESPONDING_ATTRIB_PTR_TYPE: AttribPtrType = AttribPtrType {
@@ -492,6 +495,6 @@ macro_rules! impl_attr_type {
   };
 }
 
-impl_attr_type!(f32, (F32, 1));
-impl_attr_type!(Vec2<f32>, (F32, 2));
-impl_attr_type!(Color<f32>, (F32, 4));
+impl_attrib_ptr_type!(f32, (F32, 1));
+impl_attrib_ptr_type!(Vec2<f32>, (F32, 2));
+impl_attrib_ptr_type!(Color<f32>, (F32, 4));

@@ -139,5 +139,6 @@ pub fn link_program(ctx: SharedContext, vertex: &Shader, fragment: &Shader) -> P
 
   program.detach_shader(vertex);
   program.detach_shader(fragment);
+  program.load_descriptors();
   program
 }

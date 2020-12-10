@@ -109,6 +109,7 @@ pub struct Program {
   ctx: SharedContext,
   addr: u32,
   uniform_descriptors: RefCell<HashMap<String, UniformDescriptor>>,
+  attrib_descriptors: RefCell<HashMap<String, AttribDescriptor>>,
 }
 
 impl !Send for Program {}
@@ -116,6 +117,7 @@ impl !Sync for Program {}
 
 pub const INACTIVE_UNIFORM_LOCATION: i32 = -1;
 pub const INACTIVE_ATTRIB_LOCATION: u32 = -1_i32 as u32;
+const ARRAY_NAME_MARKER: &str = "[0]";
 
 unsafe impl Object for Program {
   const DEBUG_TYPE_IDENTIFIER: u32 = gl::PROGRAM;
@@ -133,10 +135,19 @@ impl Program {
   pub fn uniform_descriptors(&self) -> Ref<HashMap<String, UniformDescriptor>> {
     self.uniform_descriptors.borrow()
   }
+  #[inline(always)]
+  pub fn attrib_descriptors(&self) -> Ref<HashMap<String, AttribDescriptor>> {
+    self.attrib_descriptors.borrow()
+  }
 
   pub fn new(ctx: SharedContext) -> Self {
     let addr = unsafe { ctx.raw_gl().CreateProgram() };
-    Self { ctx, addr, uniform_descriptors: RefCell::new(HashMap::new()) }
+    Self {
+      ctx,
+      addr,
+      uniform_descriptors: RefCell::new(HashMap::new()),
+      attrib_descriptors: RefCell::new(HashMap::new()),
+    }
   }
 
   pub fn bind(&'_ mut self) -> ProgramBinding<'_> {
@@ -183,6 +194,11 @@ impl Program {
     buf
   }
 
+  pub fn load_descriptors(&self) {
+    self.load_uniform_descriptors();
+    self.load_attrib_descriptors();
+  }
+
   pub fn load_uniform_descriptors(&self) {
     let gl = self.raw_gl();
     let mut uniform_descriptors = self.uniform_descriptors.borrow_mut();
@@ -196,7 +212,7 @@ impl Program {
 
     let mut max_name_len: i32 = 0;
     unsafe { gl.GetProgramiv(self.addr, gl::ACTIVE_UNIFORM_MAX_LENGTH, &mut max_name_len) };
-    assert!(max_name_len > 0);
+    assert!(max_name_len >= 0);
 
     for uniform_index in 0..active_uniforms_count {
       let mut name_buf = Vec::<u8>::with_capacity(max_name_len as usize);
@@ -230,14 +246,13 @@ impl Program {
 
       let mut name = String::from_utf8(name_buf).unwrap();
 
-      const ARRAY_NAME_MARKER: &str = "[0]";
       let is_array = name.ends_with(ARRAY_NAME_MARKER);
       if is_array {
         name.truncate(name.len() - ARRAY_NAME_MARKER.len());
       }
 
-      let data_type = UniformType {
-        name: UniformTypeName::from_raw_unwrap(data_type_name),
+      let data_type = GlslType {
+        name: GlslTypeName::from_raw_unwrap(data_type_name),
         array_len: if is_array { Some(data_array_len as u32) } else { None },
       };
 
@@ -245,15 +260,70 @@ impl Program {
     }
   }
 
+  pub fn load_attrib_descriptors(&self) {
+    let gl = self.raw_gl();
+    let mut attrib_descriptors = self.attrib_descriptors.borrow_mut();
+    attrib_descriptors.clear();
+    attrib_descriptors.shrink_to_fit();
+
+    let mut active_attribs_count: i32 = 0;
+    unsafe { gl.GetProgramiv(self.addr, gl::ACTIVE_ATTRIBUTES, &mut active_attribs_count) };
+    assert!(active_attribs_count >= 0);
+    attrib_descriptors.reserve(active_attribs_count as usize);
+
+    let mut max_name_len: i32 = 0;
+    unsafe { gl.GetProgramiv(self.addr, gl::ACTIVE_ATTRIBUTE_MAX_LENGTH, &mut max_name_len) };
+    assert!(max_name_len >= 0);
+
+    for attrib_index in 0..active_attribs_count {
+      let mut name_buf = Vec::<u8>::with_capacity(max_name_len as usize);
+      let mut name_len: i32 = 0;
+      let mut data_type_name: u32 = 0;
+      let mut data_array_len: i32 = 0;
+
+      unsafe {
+        self.raw_gl().GetActiveAttrib(
+          self.addr,
+          attrib_index as u32,
+          max_name_len,
+          &mut name_len,
+          &mut data_array_len,
+          &mut data_type_name,
+          name_buf.as_mut_ptr() as *mut c_char,
+        );
+      }
+      assert!(name_len > 0 && data_type_name > 0 && data_array_len > 0);
+
+      unsafe { name_buf.set_len(name_len as usize) };
+
+      // See the respective comment in `load_uniform_descriptors`
+      let location =
+        unsafe { gl.GetAttribLocation(self.addr, name_buf.as_ptr() as *const c_char) as u32 };
+
+      let mut name = String::from_utf8(name_buf).unwrap();
+
+      let is_array = name.ends_with(ARRAY_NAME_MARKER);
+      if is_array {
+        name.truncate(name.len() - ARRAY_NAME_MARKER.len());
+      }
+
+      let data_type = GlslType {
+        name: GlslTypeName::from_raw_unwrap(data_type_name),
+        array_len: if is_array { Some(data_array_len as u32) } else { None },
+      };
+
+      attrib_descriptors.insert(name, AttribDescriptor { location, data_type });
+    }
+  }
+
   pub fn get_uniform<T: CorrespondingUniformType>(&self, name: &str) -> Uniform<T> {
     #[inline(never)]
-    #[track_caller]
     fn check_uniform_type(
       this: &Program,
       name: &str,
-      corresponding_types: &'static [UniformTypeName],
+      corresponding_types: &'static [GlslTypeName],
       rust_type_name: &'static str,
-    ) -> (i32, Option<UniformType>) {
+    ) -> (i32, Option<GlslType>) {
       if let Some(descriptor) = this.uniform_descriptors.borrow().get(name) {
         let data_type = &descriptor.data_type;
         assert!(
@@ -279,47 +349,37 @@ impl Program {
     self.uniform_descriptors.borrow().get(name).map_or(INACTIVE_UNIFORM_LOCATION, |d| d.location)
   }
 
-  pub fn get_attrib<T: CorrespondingAttribPtrType>(&self, name: &str) -> Attrib<T> {
-    let location = self.get_attrib_location(name);
-    // TODO: Add type validation for attributes as well.
-    let data_type = self.get_attrib_data_type(location);
+  pub fn get_attrib<T: CorrespondingAttribType>(&self, name: &str) -> Attrib<T> {
+    #[inline(never)]
+    fn check_attrib_type(
+      this: &Program,
+      name: &str,
+      corresponding_types: &'static [GlslTypeName],
+      rust_type_name: &'static str,
+    ) -> (u32, Option<GlslType>) {
+      if let Some(descriptor) = this.attrib_descriptors.borrow().get(name) {
+        let data_type = &descriptor.data_type;
+        assert!(
+          corresponding_types.contains(&data_type.name),
+          "mismatched attribute types: values of the Rust type `{}` are not assignable to \
+          the attribute `{}` with the GLSL type `{}`",
+          rust_type_name,
+          name,
+          data_type,
+        );
+        (descriptor.location, Some(*data_type))
+      } else {
+        (INACTIVE_ATTRIB_LOCATION, None)
+      }
+    }
+
+    let (location, data_type) =
+      check_attrib_type(&self, name, T::CORRESPONDING_ATTRIB_TYPES, std::any::type_name::<T>());
     Attrib { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
 
   pub fn get_attrib_location(&self, name: &str) -> u32 {
-    let gl = self.raw_gl();
-    let c_name = CString::new(name).unwrap();
-    unsafe { gl.GetAttribLocation(self.addr, c_name.as_ptr()) as u32 }
-  }
-
-  pub fn get_attrib_data_type(&self, location: u32) -> Option<AttribType> {
-    if location == INACTIVE_ATTRIB_LOCATION {
-      return None;
-    }
-
-    let mut data_type = 0;
-    let mut data_array_len = 0;
-    unsafe {
-      self.raw_gl().GetActiveAttrib(
-        self.addr,
-        location,
-        0,               // name buffer size
-        ptr::null_mut(), // name length without the \0
-        &mut data_array_len,
-        &mut data_type,
-        ptr::null_mut(), // name buffer
-      )
-    };
-    assert!(data_type > 0 && data_array_len > 0);
-
-    if data_array_len != 1 {
-      todo!("array attributes");
-    }
-
-    Some(AttribType {
-      name: AttribTypeName::from_raw_unwrap(data_type),
-      array_len: data_array_len as u32,
-    })
+    self.attrib_descriptors.borrow().get(name).map_or(INACTIVE_ATTRIB_LOCATION, |d| d.location)
   }
 }
 
@@ -346,14 +406,18 @@ impl<'obj> Drop for ProgramBinding<'obj> {
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct UniformDescriptor {
   pub location: i32,
-  pub data_type: UniformType,
+  pub data_type: GlslType,
+}
+
+pub trait CorrespondingUniformType {
+  const CORRESPONDING_UNIFORM_TYPES: &'static [GlslTypeName];
 }
 
 #[derive(Debug)]
 pub struct Uniform<T: CorrespondingUniformType> {
   location: i32,
   program_addr: u32,
-  data_type: Option<UniformType>,
+  data_type: Option<GlslType>,
   phantom: PhantomData<*mut T>,
 }
 
@@ -368,7 +432,7 @@ impl<T: CorrespondingUniformType> Uniform<T> {
   #[inline(always)]
   pub fn program_addr(&self) -> u32 { self.program_addr }
   #[inline(always)]
-  pub fn data_type(&self) -> &Option<UniformType> { &self.data_type }
+  pub fn data_type(&self) -> &Option<GlslType> { &self.data_type }
 
   #[inline(always)]
   pub fn reflect_from(program: &Program, name: &str) -> Self { program.get_uniform(name) }
@@ -380,8 +444,8 @@ macro_rules! impl_set_uniform {
     $arg_pattern:pat, $gl_uniform_func_name:ident($($gl_uniform_func_arg:expr),+) $(,)?
   ) => {
     impl CorrespondingUniformType for $data_type {
-      const CORRESPONDING_UNIFORM_TYPES: &'static [UniformTypeName] =
-        &[$(UniformTypeName::$corresponding_type_name),+];
+      const CORRESPONDING_UNIFORM_TYPES: &'static [GlslTypeName] =
+        &[$(GlslTypeName::$corresponding_type_name),+];
     }
 
     impl Uniform<$data_type> {
@@ -412,18 +476,28 @@ impl_set_uniform!(Color<f32>, [Vec4], Color { r, g, b, a }, Uniform4f(r, g, b, a
 impl_set_uniform!(crate::TextureUnit, [Sampler2D, SamplerCube], unit, Uniform1i(unit.id() as i32));
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct UniformType {
-  pub name: UniformTypeName,
+pub struct GlslType {
+  pub name: GlslTypeName,
   pub array_len: Option<u32>,
 }
 
-impl UniformType {
+impl GlslType {
   #[inline(always)]
   pub fn is_array(&self) -> bool { self.array_len.is_some() }
 }
 
+impl fmt::Display for GlslType {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.name)?;
+    if let Some(array_len) = self.array_len {
+      write!(f, "[{}]", array_len)?;
+    }
+    Ok(())
+  }
+}
+
 gl_enum!({
-  pub enum UniformTypeName {
+  pub enum GlslTypeName {
     Float = FLOAT,
     Vec2 = FLOAT_VEC2,
     Vec3 = FLOAT_VEC3,
@@ -444,7 +518,7 @@ gl_enum!({
   }
 });
 
-impl UniformTypeName {
+impl GlslTypeName {
   pub fn components(self) -> u8 {
     match self {
       Self::Float | Self::Int | Self::Bool => 1,
@@ -459,61 +533,56 @@ impl UniformTypeName {
   }
 }
 
-impl fmt::Display for UniformType {
+impl fmt::Display for GlslTypeName {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", self.name)?;
-    if let Some(array_len) = self.array_len {
-      write!(f, "[{}]", array_len)?;
-    }
-    Ok(())
-  }
-}
-
-impl fmt::Display for UniformTypeName {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    use UniformTypeName::*;
     write!(
       f,
       "{}",
       match self {
-        Float => "float",
-        Vec2 => "vec2",
-        Vec3 => "vec3",
-        Vec4 => "vec4",
-        Int => "int",
-        IVec2 => "ivec2",
-        IVec3 => "ivec3",
-        IVec4 => "ivec4",
-        Bool => "bool",
-        BVec2 => "bvec2",
-        BVec3 => "bvec3",
-        BVec4 => "bvec4",
-        Mat2 => "mat2",
-        Mat3 => "mat3",
-        Mat4 => "mat4",
-        Sampler2D => "sampler2D",
-        SamplerCube => "samplerCube",
+        Self::Float => "float",
+        Self::Vec2 => "vec2",
+        Self::Vec3 => "vec3",
+        Self::Vec4 => "vec4",
+        Self::Int => "int",
+        Self::IVec2 => "ivec2",
+        Self::IVec3 => "ivec3",
+        Self::IVec4 => "ivec4",
+        Self::Bool => "bool",
+        Self::BVec2 => "bvec2",
+        Self::BVec3 => "bvec3",
+        Self::BVec4 => "bvec4",
+        Self::Mat2 => "mat2",
+        Self::Mat3 => "mat3",
+        Self::Mat4 => "mat4",
+        Self::Sampler2D => "sampler2D",
+        Self::SamplerCube => "samplerCube",
       }
     )
   }
 }
 
-pub trait CorrespondingUniformType {
-  const CORRESPONDING_UNIFORM_TYPES: &'static [UniformTypeName];
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+pub struct AttribDescriptor {
+  pub location: u32,
+  pub data_type: GlslType,
+}
+
+pub trait CorrespondingAttribType {
+  const CORRESPONDING_ATTRIB_TYPES: &'static [GlslTypeName];
 }
 
 #[derive(Debug)]
-pub struct Attrib<T: CorrespondingAttribPtrType> {
+pub struct Attrib<T: CorrespondingAttribType> {
   location: u32,
   program_addr: u32,
-  data_type: Option<AttribType>,
+  data_type: Option<GlslType>,
   phantom: PhantomData<*mut T>,
 }
 
 impl<T> !Send for Attrib<T> {}
 impl<T> !Sync for Attrib<T> {}
 
-impl<T: CorrespondingAttribPtrType> Attrib<T> {
+impl<T: CorrespondingAttribType + CorrespondingAttribPtrType> Attrib<T> {
   #[inline(always)]
   pub fn location(&self) -> u32 { self.location }
   #[inline(always)]
@@ -521,43 +590,24 @@ impl<T: CorrespondingAttribPtrType> Attrib<T> {
   #[inline(always)]
   pub fn program_addr(&self) -> u32 { self.program_addr }
   #[inline(always)]
-  pub fn data_type(&self) -> &Option<AttribType> { &self.data_type }
+  pub fn data_type(&self) -> &Option<GlslType> { &self.data_type }
 
   #[inline(always)]
   pub fn reflect_from(program: &Program, name: &str) -> Self { program.get_attrib(name) }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Hash)]
-pub struct AttribType {
-  pub name: AttribTypeName,
-  pub array_len: u32,
-}
-
-gl_enum!({
-  pub enum AttribTypeName {
-    Float = FLOAT,
-    Vec2 = FLOAT_VEC2,
-    Vec3 = FLOAT_VEC3,
-    Vec4 = FLOAT_VEC4,
-    // Mat2 = FLOAT_MAT2,
-    // Mat3 = FLOAT_MAT3,
-    // Mat4 = FLOAT_MAT4,
-  }
-});
-
-impl AttribTypeName {
-  pub fn components(&self) -> u8 {
-    match self {
-      Self::Float => 1,
-      Self::Vec2 => 2,
-      Self::Vec3 => 3,
-      Self::Vec4 => 4,
-      // Self::Mat2 => 2 * 2,
-      // Self::Mat3 => 3 * 3,
-      // Self::Mat4 => 4 * 4,
+macro_rules! impl_attrib_type {
+  ($data_type:ty, [$($corresponding_type_name:ident),+]) => {
+    impl CorrespondingAttribType for $data_type {
+      const CORRESPONDING_ATTRIB_TYPES: &'static [GlslTypeName] =
+        &[$(GlslTypeName::$corresponding_type_name),+];
     }
-  }
+  };
 }
+
+impl_attrib_type!(f32, [Float]);
+impl_attrib_type!(Vec2<f32>, [Vec2]);
+impl_attrib_type!(Color<f32>, [Vec4]);
 
 #[macro_export]
 macro_rules! program_reflection_block {
