@@ -165,6 +165,11 @@ impl Program {
     unsafe { self.raw_gl().DetachShader(self.addr, shader.addr) };
   }
 
+  pub fn request_attrib_location(&self, name: &str, location: u32) {
+    let c_name = CString::new(name).unwrap();
+    unsafe { self.raw_gl().BindAttribLocation(self.addr, location, c_name.as_ptr()) };
+  }
+
   pub fn link(&self) -> bool {
     let gl = self.raw_gl();
 
