@@ -1,0 +1,1 @@
+The files in this directory were taken from <https://github.com/JoeyDeVries/LearnOpenGL/tree/master/resources>. They are licensed under the CC BY-NC 4.0 license, see <https://github.com/JoeyDeVries/LearnOpenGL/blob/master/LICENSE.md> for more information.

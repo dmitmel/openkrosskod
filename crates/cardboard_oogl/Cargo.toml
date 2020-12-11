@@ -10,5 +10,9 @@ gl = { path = "../gl" }
 cardboard_math = { path = "../cardboard_math" }
 prelude-plus = { path = "../prelude-plus" }
 
+[dev-dependencies]
+png = { version = "0.16.7", default-features = false }
+jpeg-decoder = { version = "0.1.20", default-features = false }
+
 [features]
 debug_all_commands = ["gl/debug_all_commands"]

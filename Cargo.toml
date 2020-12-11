@@ -18,7 +18,7 @@ cardboard_math = { path = "crates/cardboard_math", features = ["serde", "const_f
 cardboard_oogl = { path = "crates/cardboard_oogl" }
 
 sdl2 = "0.34.3"
-png = "0.16.7"
+png = { version = "0.16.7", default-features = false }
 
 serde = { version = "1.0.116", features = ["derive"] }
 # simd-json needs serde_json anyway, so the non-SIMD implementation is not maked

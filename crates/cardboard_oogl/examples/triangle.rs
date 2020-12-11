@@ -107,8 +107,8 @@ fn main() {
   }
 }
 
-pub fn compile_shader(ctx: SharedContext, src: &str, type_: ShaderType) -> Shader {
-  let shader = Shader::new(ctx, type_);
+fn compile_shader(gl: SharedContext, src: &str, type_: ShaderType) -> Shader {
+  let shader = Shader::new(gl, type_);
   shader.set_source(src.as_bytes());
   let success = shader.compile();
 
@@ -123,8 +123,8 @@ pub fn compile_shader(ctx: SharedContext, src: &str, type_: ShaderType) -> Shade
   shader
 }
 
-pub fn link_program(ctx: SharedContext, vertex: &Shader, fragment: &Shader) -> Program {
-  let program = Program::new(ctx);
+fn link_program(gl: SharedContext, vertex: &Shader, fragment: &Shader) -> Program {
+  let program = Program::new(gl);
   program.attach_shader(vertex);
   program.attach_shader(fragment);
   let success = program.link();
