@@ -10,7 +10,7 @@ uniform sampler2D u_tex;
 varying vec2 v_pos;
 varying vec2 v_texcoord;
 
-void main(void) {
+void main() {
   if (dot(v_pos, v_pos) > 1.0) {
     discard;
   }

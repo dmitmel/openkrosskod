@@ -22,7 +22,7 @@ mat2 rotate(float angle) {
   return mat2(c, -s, s, c);
 }
 
-void main(void) {
+void main() {
   gl_Position = vec4(
     (u_pos + (a_pos * 0.5) * u_size * rotate(u_rotation)) / (u_window_size * 0.5),
     0.0, 1.0

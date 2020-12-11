@@ -14,7 +14,7 @@ struct Vertex {
 }
 
 #[rustfmt::skip]
-const VERTEX_DATA: [Vertex; 3] = [
+const VERTEX_DATA: &[Vertex] = &[
   Vertex { pos: vec2( 0.0,  0.5), color: color(1.0, 0.0, 0.0, 1.0) },
   Vertex { pos: vec2( 0.5, -0.5), color: color(0.0, 1.0, 0.0, 1.0) },
   Vertex { pos: vec2(-0.5, -0.5), color: color(0.0, 0.0, 1.0, 1.0) },
@@ -24,7 +24,7 @@ static VS_SRC: &str = r#"#version 100
   attribute vec2 a_pos;
   attribute vec4 a_color;
   varying   vec4 v_color;
-  void main(void) {
+  void main() {
     gl_Position = vec4(a_pos, 0.0, 1.0);
     v_color = a_color;
   }
@@ -74,7 +74,7 @@ fn main() {
   let bound_vbo = vbo.bind();
   bound_vbo.enable_attribs();
   bound_vbo.configure_attribs();
-  bound_vbo.reserve_and_set(BufferUsageHint::StaticDraw, &VERTEX_DATA);
+  bound_vbo.reserve_and_set(BufferUsageHint::StaticDraw, VERTEX_DATA);
 
   gl.set_clear_color(color(0.0, 0.0, 0.0, 1.0));
 

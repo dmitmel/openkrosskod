@@ -20,7 +20,7 @@ varying vec2 v_texcoord;
   attribute vec4 a_color;
   attribute vec2 a_texcoord;
 
-  void main(void) {
+  void main() {
     gl_Position = vec4(a_position, 0.0, 1.0);
     v_position = a_position;
     v_color = a_color;
@@ -41,7 +41,7 @@ varying vec2 v_texcoord;
     return vec4(gamma_correct(color.rgb), color.a);
   }
 
-  void main(void) {
+  void main() {
     gl_FragColor = mix(texture2D(u_tex, v_texcoord), gamma_correct(v_color), v_color.a);
   }
 
