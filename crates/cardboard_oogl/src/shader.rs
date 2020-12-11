@@ -438,7 +438,31 @@ impl<T: CorrespondingUniformType> Uniform<T> {
   pub fn reflect_from(program: &Program, name: &str) -> Self { program.get_uniform(name) }
 }
 
-macro_rules! impl_set_uniform {
+pub trait SetToUniform: CorrespondingUniformType {
+  unsafe fn set_to_uniform_unchecked(raw_gl: &RawGL, location: i32, value: &Self);
+}
+
+impl<T: SetToUniform> Uniform<T> {
+  pub fn set(&self, program_binding: &ProgramBinding<'_>, value: &T) {
+    let program = &program_binding.program;
+    assert!(self.program_addr == program.addr);
+    unsafe { T::set_to_uniform_unchecked(program.raw_gl(), self.location, value) };
+  }
+
+  pub fn set_at_index(&self, program_binding: &ProgramBinding<'_>, index: u32, value: &T) {
+    let program = &program_binding.program;
+    assert!(self.program_addr == program.addr);
+    if let Some(data_type) = self.data_type {
+      assert!(index < data_type.array_len.unwrap_or(1));
+    }
+    if self.location != INACTIVE_UNIFORM_LOCATION {
+      let location = self.location + index as i32;
+      unsafe { T::set_to_uniform_unchecked(program.raw_gl(), location, value) };
+    }
+  }
+}
+
+macro_rules! impl_set_to_uniform {
   (
     $data_type:ty, [$($corresponding_type_name:ident),+],
     $arg_pattern:pat, $gl_uniform_func_name:ident($($gl_uniform_func_arg:expr),+) $(,)?
@@ -448,32 +472,31 @@ macro_rules! impl_set_uniform {
         &[$(GlslTypeName::$corresponding_type_name),+];
     }
 
-    impl Uniform<$data_type> {
-      pub fn set(&self, program_binding: &ProgramBinding<'_>, value: $data_type) {
-        // For some reason applying the pattern directly in the method
-        // signature causes rust-analyzer to report false-positive "argument
-        // count mismatch" errors. Well, nevermind, I'll do that with a local
-        // variable binding then (`value` is inaccessible from the macro
-        // invocation thanks to macro hygiene).
+    impl SetToUniform for $data_type {
+      #[inline(always)]
+      unsafe fn set_to_uniform_unchecked(raw_gl: &RawGL, location: i32, value: &Self) {
         let $arg_pattern = value;
-        let program = &program_binding.program;
-        assert_eq!(self.program_addr, program.addr);
-        unsafe { program.raw_gl().$gl_uniform_func_name(self.location, $($gl_uniform_func_arg),+) };
+        raw_gl.$gl_uniform_func_name(location, $($gl_uniform_func_arg),+);
       }
     }
   };
 }
 
-impl_set_uniform!(f32, [Float], x, Uniform1f(x));
-impl_set_uniform!(u32, [Int], x, Uniform1i(x as i32));
-impl_set_uniform!(i32, [Int], x, Uniform1i(x));
-impl_set_uniform!(bool, [Bool], x, Uniform1i(x as i32));
-impl_set_uniform!(Vec2<f32>, [Vec2], Vec2 { x, y }, Uniform2f(x, y));
-impl_set_uniform!(Vec2<i32>, [IVec2], Vec2 { x, y }, Uniform2i(x, y));
-impl_set_uniform!(Vec2<u32>, [IVec2], Vec2 { x, y }, Uniform2i(x as i32, y as i32));
-impl_set_uniform!(Vec2<bool>, [BVec2], Vec2 { x, y }, Uniform2i(x as i32, y as i32));
-impl_set_uniform!(Color<f32>, [Vec4], Color { r, g, b, a }, Uniform4f(r, g, b, a));
-impl_set_uniform!(crate::TextureUnit, [Sampler2D, SamplerCube], unit, Uniform1i(unit.id() as i32));
+impl_set_to_uniform!(f32, [Float], &x, Uniform1f(x));
+impl_set_to_uniform!(u32, [Int], &x, Uniform1i(x as i32));
+impl_set_to_uniform!(i32, [Int], &x, Uniform1i(x));
+impl_set_to_uniform!(bool, [Bool], &x, Uniform1i(x as i32));
+impl_set_to_uniform!(Vec2<f32>, [Vec2], &Vec2 { x, y }, Uniform2f(x, y));
+impl_set_to_uniform!(Vec2<i32>, [IVec2], &Vec2 { x, y }, Uniform2i(x, y));
+impl_set_to_uniform!(Vec2<u32>, [IVec2], &Vec2 { x, y }, Uniform2i(x as i32, y as i32));
+impl_set_to_uniform!(Vec2<bool>, [BVec2], &Vec2 { x, y }, Uniform2i(x as i32, y as i32));
+impl_set_to_uniform!(Color<f32>, [Vec4], &Color { r, g, b, a }, Uniform4f(r, g, b, a));
+impl_set_to_uniform!(
+  crate::TextureUnit,
+  [Sampler2D, SamplerCube],
+  unit,
+  Uniform1i(unit.id() as i32)
+);
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub struct GlslType {

@@ -10,7 +10,7 @@ use std::fmt;
 use std::ops::*;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Deserialize, Serialize)]
-#[repr(C)] // TODO: do we lose efficiency with repr(C) in this case?
+#[repr(C)]
 pub struct Vec2<T> {
   pub x: T,
   pub y: T,

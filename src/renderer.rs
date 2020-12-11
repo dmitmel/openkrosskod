@@ -106,7 +106,7 @@ impl Renderer {
         (&mut self.ellipse_program, &mut self.ellipse_program_reflection),
       ] {
         let bound_program = program.bind();
-        reflection.u_window_size.set(&bound_program, window_size);
+        reflection.u_window_size.set(&bound_program, &window_size);
       }
     }
   }
@@ -129,17 +129,17 @@ impl Renderer {
       }
     };
 
-    reflection.u_pos.set(&program, shape.pos);
-    reflection.u_size.set(&program, shape.size);
-    reflection.u_rotation.set(&program, shape.rotation);
-    reflection.u_color.set(&program, color);
-    reflection.u_tex.set(&program, texture_unit);
+    reflection.u_pos.set(&program, &shape.pos);
+    reflection.u_size.set(&program, &shape.size);
+    reflection.u_rotation.set(&program, &shape.rotation);
+    reflection.u_color.set(&program, &color);
+    reflection.u_tex.set(&program, &texture_unit);
     if let Some(clipping) = &shape.fill_clipping {
-      reflection.u_tex_clipping_offset.set(&program, clipping.offset);
-      reflection.u_tex_clipping_size.set(&program, clipping.size);
+      reflection.u_tex_clipping_offset.set(&program, &clipping.offset);
+      reflection.u_tex_clipping_size.set(&program, &clipping.size);
     } else {
-      reflection.u_tex_clipping_offset.set(&program, vec2n(0.0));
-      reflection.u_tex_clipping_size.set(&program, vec2n(1.0));
+      reflection.u_tex_clipping_offset.set(&program, &vec2n(0.0));
+      reflection.u_tex_clipping_size.set(&program, &vec2n(1.0));
     }
 
     let bound_vbo = self.vbo.bind();
