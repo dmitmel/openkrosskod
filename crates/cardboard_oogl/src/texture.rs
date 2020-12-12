@@ -14,7 +14,6 @@ gl_enum!({
 pub struct Texture2D<T: TextureDataType = u8> {
   ctx: SharedContext,
   addr: u32,
-  internal_state_acquired: bool,
 
   input_format: TextureInputFormat,
   internal_format: TextureInternalFormat,
@@ -34,8 +33,6 @@ unsafe impl<T: TextureDataType> Object for Texture2D<T> {
   fn ctx(&self) -> &SharedContext { &self.ctx }
   #[inline(always)]
   fn addr(&self) -> u32 { self.addr }
-  #[inline(always)]
-  fn internal_state_acquired(&self) -> bool { self.internal_state_acquired }
 }
 
 impl<T: TextureDataType> Texture2D<T> {
@@ -48,16 +45,16 @@ impl<T: TextureDataType> Texture2D<T> {
 
   pub fn new(
     ctx: SharedContext,
+    unit: &TextureUnit,
     input_format: TextureInputFormat,
     internal_format_preference: Option<TextureInternalFormat>,
   ) -> Self {
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenTextures(1, &mut addr) };
 
-    Self {
+    let mut this = Self {
       ctx,
       addr,
-      internal_state_acquired: false,
 
       input_format,
       internal_format: internal_format_preference
@@ -66,7 +63,9 @@ impl<T: TextureDataType> Texture2D<T> {
       levels_of_detail_count: Cell::new(0),
 
       phantom: PhantomData,
-    }
+    };
+    drop(this.bind(&unit));
+    this
   }
 
   pub fn size_at_level_of_detail(&self, level_of_detail: u32) -> Vec2u32 {
@@ -90,7 +89,6 @@ impl<T: TextureDataType> Texture2D<T> {
     }
     if different_texture_was_bound || different_unit_was_selected {
       binding_target.bind_unconditionally(self.raw_gl(), self.addr);
-      self.internal_state_acquired = true;
     }
     Texture2DBinding { texture: self }
   }

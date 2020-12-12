@@ -27,8 +27,6 @@ unsafe impl Object for Shader {
   fn ctx(&self) -> &SharedContext { &self.ctx }
   #[inline(always)]
   fn addr(&self) -> u32 { self.addr }
-  #[inline(always)]
-  fn internal_state_acquired(&self) -> bool { true }
 }
 
 impl Shader {
@@ -126,8 +124,6 @@ unsafe impl Object for Program {
   fn ctx(&self) -> &SharedContext { &self.ctx }
   #[inline(always)]
   fn addr(&self) -> u32 { self.addr }
-  #[inline(always)]
-  fn internal_state_acquired(&self) -> bool { true }
 }
 
 impl Program {

@@ -63,9 +63,9 @@ impl Renderer {
       })],
     );
 
+    vbo.set_debug_label(b"Renderer.vbo");
     {
       let bound_vbo = vbo.bind();
-      bound_vbo.object().set_debug_label(b"vbo");
       bound_vbo.enable_attribs();
       bound_vbo.configure_attribs();
       bound_vbo
@@ -74,11 +74,15 @@ impl Renderer {
 
     let texture_unit = oogl::TextureUnit::new(globals.gl.share());
 
-    let mut white_texture =
-      oogl::Texture2D::new(globals.gl.share(), oogl::TextureInputFormat::RGBA, None);
+    let mut white_texture = oogl::Texture2D::new(
+      globals.gl.share(),
+      &texture_unit,
+      oogl::TextureInputFormat::RGBA,
+      None,
+    );
+    white_texture.set_debug_label(b"Renderer.white_texture");
     {
       let bound_texture = white_texture.bind(&texture_unit);
-      bound_texture.object().set_debug_label(b"white_texture");
       bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
       bound_texture.set_filters(oogl::TextureFilter::Linear, None);
       bound_texture.set_size(vec2n(1));
@@ -381,12 +385,13 @@ pub fn load_texture_data_from_png<R: Read>(
   };
 
   let texture_unit = oogl::TextureUnit::new(gl.share());
-  let mut texture = oogl::Texture2D::new(gl, gl_format, None);
-  let bound_texture = texture.bind(&texture_unit);
-  bound_texture.object().set_debug_label(debug_label);
-  bound_texture.set_size(vec2(info.width, info.height));
-  bound_texture.reserve_and_set(0, &buf);
-  drop(bound_texture);
+  let mut texture = oogl::Texture2D::new(gl, &texture_unit, gl_format, None);
+  texture.set_debug_label(debug_label);
+  {
+    let bound_texture = texture.bind(&texture_unit);
+    bound_texture.set_size(vec2(info.width, info.height));
+    bound_texture.reserve_and_set(0, &buf);
+  }
 
   Ok(texture)
 }

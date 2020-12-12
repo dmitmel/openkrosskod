@@ -9,13 +9,11 @@ pub unsafe trait Object {
 
   fn ctx(&self) -> &SharedContext;
   fn addr(&self) -> u32;
-  fn internal_state_acquired(&self) -> bool;
 
   #[inline(always)]
   fn raw_gl(&self) -> &RawGL { self.ctx().raw_gl() }
 
   fn set_debug_label(&self, label: &[u8]) {
-    assert!(self.internal_state_acquired());
     let type_identifier = Self::DEBUG_TYPE_IDENTIFIER;
     unsafe { debug::set_object_debug_label(self.ctx(), type_identifier, self.addr(), label) };
   }

@@ -195,7 +195,7 @@ fn load_png_texture_2d(gl: SharedContext, encoded_data: &[u8]) -> Texture2D {
   assert!(info.color_type == png::ColorType::RGBA);
 
   let texture_unit = TextureUnit::new(gl.share());
-  let mut texture = Texture2D::new(gl, TextureInputFormat::RGBA, None);
+  let mut texture = Texture2D::new(gl, &texture_unit, TextureInputFormat::RGBA, None);
   {
     let bound_texture = texture.bind(&texture_unit);
     bound_texture.set_size(vec2(info.width, info.height));
@@ -213,7 +213,7 @@ fn load_jpeg_texture_2d(gl: SharedContext, encoded_data: &[u8]) -> Texture2D {
   assert!(info.pixel_format == jpeg_decoder::PixelFormat::RGB24);
 
   let texture_unit = TextureUnit::new(gl.share());
-  let mut texture = Texture2D::new(gl, TextureInputFormat::RGB, None);
+  let mut texture = Texture2D::new(gl, &texture_unit, TextureInputFormat::RGB, None);
   {
     let bound_texture = texture.bind(&texture_unit);
     bound_texture.set_size(vec2(info.width as u32, info.height as u32));

@@ -15,7 +15,6 @@ gl_enum!({
 pub struct VertexBuffer<T: Copy> {
   ctx: SharedContext,
   addr: u32,
-  internal_state_acquired: bool,
 
   attribs: Vec<AttribPtr>,
   stride: u32,
@@ -34,8 +33,6 @@ unsafe impl<T: Copy> Object for VertexBuffer<T> {
   fn ctx(&self) -> &SharedContext { &self.ctx }
   #[inline(always)]
   fn addr(&self) -> u32 { self.addr }
-  #[inline(always)]
-  fn internal_state_acquired(&self) -> bool { self.internal_state_acquired }
 }
 
 impl<T: Copy> VertexBuffer<T> {
@@ -56,24 +53,15 @@ impl<T: Copy> VertexBuffer<T> {
 
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenBuffers(1, &mut addr) };
-    Self {
-      ctx,
-      addr,
-      internal_state_acquired: false,
-
-      attribs,
-      stride,
-      len: Cell::new(0),
-
-      phantom: PhantomData,
-    }
+    let mut this = Self { ctx, addr, attribs, stride, len: Cell::new(0), phantom: PhantomData };
+    drop(this.bind());
+    this
   }
 
   pub fn bind(&mut self) -> VertexBufferBinding<'_, T> {
     let binding_target = &self.ctx.bound_vertex_buffer;
     binding_target.on_binding_created(self.addr);
     binding_target.bind_if_needed(self.raw_gl(), self.addr);
-    self.internal_state_acquired = true;
     VertexBufferBinding { buffer: self }
   }
 }
@@ -153,7 +141,6 @@ impl<'obj, T: Copy> VertexBufferBinding<'obj, T> {
 pub struct ElementBuffer<T: BufferIndex> {
   ctx: SharedContext,
   addr: u32,
-  internal_state_acquired: bool,
 
   len: Cell<usize>,
 
@@ -170,22 +157,21 @@ unsafe impl<T: BufferIndex> Object for ElementBuffer<T> {
   fn ctx(&self) -> &SharedContext { &self.ctx }
   #[inline(always)]
   fn addr(&self) -> u32 { self.addr }
-  #[inline(always)]
-  fn internal_state_acquired(&self) -> bool { self.internal_state_acquired }
 }
 
 impl<T: BufferIndex> ElementBuffer<T> {
   pub fn new(ctx: SharedContext) -> Self {
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenBuffers(1, &mut addr) };
-    Self { ctx, addr, internal_state_acquired: false, len: Cell::new(0), phantom: PhantomData }
+    let mut this = Self { ctx, addr, len: Cell::new(0), phantom: PhantomData };
+    drop(this.bind());
+    this
   }
 
   pub fn bind(&mut self) -> ElementBufferBinding<'_, T> {
     let binding_target = &self.ctx.bound_element_buffer;
     binding_target.on_binding_created(self.addr);
     binding_target.bind_if_needed(self.raw_gl(), self.addr);
-    self.internal_state_acquired = true;
     ElementBufferBinding { buffer: self }
   }
 }

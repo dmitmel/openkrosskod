@@ -11,7 +11,6 @@ gl_enum!({
 pub struct Framebuffer {
   ctx: SharedContext,
   addr: u32,
-  internal_state_acquired: bool,
 }
 
 impl !Send for Framebuffer {}
@@ -24,8 +23,6 @@ unsafe impl Object for Framebuffer {
   fn ctx(&self) -> &SharedContext { &self.ctx }
   #[inline(always)]
   fn addr(&self) -> u32 { self.addr }
-  #[inline(always)]
-  fn internal_state_acquired(&self) -> bool { self.internal_state_acquired }
 }
 
 impl Framebuffer {
@@ -34,14 +31,15 @@ impl Framebuffer {
   pub fn new(ctx: SharedContext) -> Self {
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenFramebuffers(1, &mut addr) };
-    Self { ctx, addr, internal_state_acquired: false }
+    let mut this = Self { ctx, addr };
+    drop(this.bind());
+    this
   }
 
   pub fn bind(&'_ mut self) -> FramebufferBinding<'_> {
     let binding_target = &self.ctx.bound_framebuffer;
     binding_target.on_binding_created(self.addr);
     binding_target.bind_if_needed(self.raw_gl(), self.addr);
-    self.internal_state_acquired = true;
     FramebufferBinding { framebuffer: self }
   }
 }
