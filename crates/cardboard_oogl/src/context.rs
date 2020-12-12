@@ -295,7 +295,7 @@ impl ContextCapabilities {
       glsl_version,
       extensions,
 
-      max_texture_units: get_u32_1(gl, gl::MAX_COMBINED_TEXTURE_IMAGE_UNITS).max(u16::MAX as u32)
+      max_texture_units: get_u32_1(gl, gl::MAX_COMBINED_TEXTURE_IMAGE_UNITS).min(u16::MAX as u32)
         as u16,
       max_texture_size: get_u32_1(gl, gl::MAX_TEXTURE_SIZE),
       max_vertex_attribs: get_u32_1(gl, gl::MAX_VERTEX_ATTRIBS),
