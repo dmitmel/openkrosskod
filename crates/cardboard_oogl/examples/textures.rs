@@ -1,10 +1,11 @@
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Keycode;
-use sdl2::video::{GLProfile, Window};
 
 use cardboard_math::*;
 use cardboard_oogl::*;
-use std::rc::Rc;
+
+#[path = "common.rs"]
+mod common;
 
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
@@ -39,10 +40,13 @@ static FS_SRC: &str = r#"#version 100
   precision highp float;
   varying vec4 v_color;
   varying vec2 v_texcoord;
+  uniform float u_blending_factor;
   uniform sampler2D u_tex1;
   uniform sampler2D u_tex2;
   void main() {
-    gl_FragColor = mix(texture2D(u_tex1, v_texcoord), texture2D(u_tex2, v_texcoord), 0.2) * v_color;
+    gl_FragColor = mix(
+      texture2D(u_tex1, v_texcoord), texture2D(u_tex2, v_texcoord), u_blending_factor
+    ) * v_color;
   }
 "#;
 
@@ -50,34 +54,18 @@ const IMAGE_DATA_1: &[u8] = include_bytes!("./assets/LearnOpenGL/container.jpeg"
 const IMAGE_DATA_2: &[u8] = include_bytes!("./assets/LearnOpenGL/awesomeface.png");
 
 fn main() {
-  let sdl_context = sdl2::init().unwrap();
-  let video_subsystem = sdl_context.video().unwrap();
+  let (_sdl_context, _video_subsystem, window, mut event_pump, gl) =
+    common::prepare_example_gl_context("textures", vec2(800, 600));
 
-  let gl_attr = video_subsystem.gl_attr();
-  gl_attr.set_context_profile(GLProfile::GLES);
-  gl_attr.set_context_version(2, 0);
+  let vs = common::compile_shader(gl.share(), VS_SRC, ShaderType::Vertex);
+  let fs = common::compile_shader(gl.share(), FS_SRC, ShaderType::Fragment);
 
-  let window = video_subsystem
-    .window("cardboard_oogl textures example", 800, 600)
-    .resizable()
-    .opengl()
-    .allow_highdpi()
-    .build()
-    .unwrap();
-
-  let sdl_gl_ctx = window.gl_create_context().unwrap();
-  let gl = Rc::new(Context::load_with(&video_subsystem, sdl_gl_ctx));
-
-  let mut event_pump = sdl_context.event_pump().unwrap();
-
-  let vs = compile_shader(gl.share(), VS_SRC, ShaderType::Vertex);
-  let fs = compile_shader(gl.share(), FS_SRC, ShaderType::Fragment);
-
-  let mut program = link_program(gl.share(), &vs, &fs);
+  let mut program = common::link_program(gl.share(), &vs, &fs);
 
   let attr_pos = program.get_attrib::<Vec2f>("a_pos");
   let attr_color = program.get_attrib::<Colorf>("a_color");
   let attr_texcoord = program.get_attrib::<Vec2f>("a_texcoord");
+  let uni_blending_factor = program.get_uniform::<f32>("u_blending_factor");
   let uni_tex1 = program.get_uniform::<TextureUnit>("u_tex1");
   let uni_tex2 = program.get_uniform::<TextureUnit>("u_tex2");
 
@@ -101,6 +89,7 @@ fn main() {
   let texture_unit2 = TextureUnit::new(gl.share());
   uni_tex1.set(&bound_program, &texture_unit1);
   uni_tex2.set(&bound_program, &texture_unit2);
+  uni_blending_factor.set(&bound_program, &0.2);
 
   let mut texture1 = load_jpeg_texture_2d(gl.share(), IMAGE_DATA_1);
   {
@@ -120,12 +109,7 @@ fn main() {
 
   gl.set_clear_color(colorn(0.1, 1.0));
 
-  fn reset_viewport(gl: &Context, window: &Window) {
-    let (w, h) = window.drawable_size();
-    gl.set_viewport(vec2(0, 0), vec2(w as i32, h as i32));
-  }
-
-  reset_viewport(&gl, &window);
+  common::reset_gl_viewport(&gl, &window);
 
   'running: loop {
     for event in event_pump.poll_iter() {
@@ -135,7 +119,7 @@ fn main() {
         }
 
         Event::Window { win_event: WindowEvent::SizeChanged(..), .. } => {
-          reset_viewport(&gl, &window);
+          common::reset_gl_viewport(&gl, &window);
         }
 
         _ => {}
@@ -147,42 +131,6 @@ fn main() {
 
     window.gl_swap_window();
   }
-}
-
-fn compile_shader(gl: SharedContext, src: &str, type_: ShaderType) -> Shader {
-  let shader = Shader::new(gl, type_);
-  shader.set_source(src.as_bytes());
-  let success = shader.compile();
-
-  let log = shader.get_info_log();
-  let log = String::from_utf8_lossy(&log);
-  if !success {
-    panic!("Shader compilation error(s):\n{}", log);
-  } else if !log.is_empty() {
-    eprintln!("Shader compilation warning(s):\n{}", log);
-  }
-
-  shader
-}
-
-fn link_program(gl: SharedContext, vertex: &Shader, fragment: &Shader) -> Program {
-  let program = Program::new(gl);
-  program.attach_shader(vertex);
-  program.attach_shader(fragment);
-  let success = program.link();
-
-  let log = program.get_info_log();
-  let log = String::from_utf8_lossy(&log);
-  if !success {
-    panic!("Program linking error(s):\n{}", log);
-  } else if !log.is_empty() {
-    eprintln!("Program linking warning(s):\n{}", log);
-  }
-
-  program.detach_shader(vertex);
-  program.detach_shader(fragment);
-  program.load_descriptors();
-  program
 }
 
 fn load_png_texture_2d(gl: SharedContext, encoded_data: &[u8]) -> Texture2D {

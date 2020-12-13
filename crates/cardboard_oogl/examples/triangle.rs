@@ -1,10 +1,10 @@
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Keycode;
 use sdl2::video::{GLProfile, Window};
+use std::rc::Rc;
 
 use cardboard_math::*;
 use cardboard_oogl::*;
-use std::rc::Rc;
 
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
