@@ -69,7 +69,7 @@ impl Renderer {
       bound_vbo.enable_attribs();
       bound_vbo.configure_attribs();
       bound_vbo
-        .reserve_and_set(oogl::BufferUsageHint::StaticDraw, &[[-1, -1], [-1, 1], [1, 1], [1, -1]]);
+        .alloc_and_set(oogl::BufferUsageHint::StaticDraw, &[[-1, -1], [-1, 1], [1, 1], [1, -1]]);
     }
 
     let texture_unit = oogl::TextureUnit::new(globals.gl.share());
@@ -86,7 +86,7 @@ impl Renderer {
       bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
       bound_texture.set_filters(oogl::TextureFilter::Linear, None);
       bound_texture.set_size(vec2n(1));
-      bound_texture.reserve_and_set(0, &[0xFF, 0xFF, 0xFF, 0xFF]);
+      bound_texture.alloc_and_set(0, &[0xFF, 0xFF, 0xFF, 0xFF]);
     }
 
     Ok(Self {
@@ -390,7 +390,7 @@ pub fn load_texture_data_from_png<R: Read>(
   {
     let bound_texture = texture.bind(&texture_unit);
     bound_texture.set_size(vec2(info.width, info.height));
-    bound_texture.reserve_and_set(0, &buf);
+    bound_texture.alloc_and_set(0, &buf);
   }
 
   Ok(texture)

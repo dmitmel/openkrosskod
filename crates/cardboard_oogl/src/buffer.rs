@@ -274,11 +274,11 @@ where
   #[inline(always)]
   fn is_empty(&'obj self) -> bool { self.object().is_empty() }
 
-  fn reserve_and_set(&'obj self, usage_hint: BufferUsageHint, data: &[T]) {
+  fn alloc_and_set(&'obj self, usage_hint: BufferUsageHint, data: &[T]) {
     unsafe { self.__impl_buffer_data(data.len(), data.as_ptr(), usage_hint) };
   }
 
-  fn reserve(&'obj self, usage_hint: BufferUsageHint, data_len: usize) {
+  fn alloc(&'obj self, usage_hint: BufferUsageHint, data_len: usize) {
     unsafe { self.__impl_buffer_data(data_len, ptr::null(), usage_hint) };
   }
 

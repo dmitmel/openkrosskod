@@ -95,7 +95,7 @@ fn main() {
   let bound_vbo = vbo.bind();
   bound_vbo.enable_attribs();
   bound_vbo.configure_attribs();
-  bound_vbo.reserve_and_set(BufferUsageHint::StaticDraw, &VERTEX_DATA);
+  bound_vbo.alloc_and_set(BufferUsageHint::StaticDraw, &VERTEX_DATA);
 
   let texture_unit1 = TextureUnit::new(gl.share());
   let texture_unit2 = TextureUnit::new(gl.share());
@@ -199,7 +199,7 @@ fn load_png_texture_2d(gl: SharedContext, encoded_data: &[u8]) -> Texture2D {
   {
     let bound_texture = texture.bind(&texture_unit);
     bound_texture.set_size(vec2(info.width, info.height));
-    bound_texture.reserve_and_set(0, &buf);
+    bound_texture.alloc_and_set(0, &buf);
   }
 
   texture
@@ -217,7 +217,7 @@ fn load_jpeg_texture_2d(gl: SharedContext, encoded_data: &[u8]) -> Texture2D {
   {
     let bound_texture = texture.bind(&texture_unit);
     bound_texture.set_size(vec2(info.width as u32, info.height as u32));
-    bound_texture.reserve_and_set(0, &buf);
+    bound_texture.alloc_and_set(0, &buf);
   }
 
   texture

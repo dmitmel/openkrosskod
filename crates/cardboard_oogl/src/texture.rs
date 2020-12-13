@@ -206,21 +206,21 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
     self.set_magnifying_filter(filter);
   }
 
-  pub fn reserve_and_set(&self, level_of_detail: u32, data: &[T]) {
+  pub fn alloc_and_set(&self, level_of_detail: u32, data: &[T]) {
     let size = self.texture.size_at_level_of_detail(level_of_detail);
     assert_eq!(
       data.len(),
       size.x as usize * size.y as usize * self.texture.input_format.color_components() as usize
     );
 
-    self.reserve_and_set_internal(level_of_detail, data.as_ptr());
+    self.alloc_and_set_internal(level_of_detail, data.as_ptr());
   }
 
-  pub fn reserve(&self, level_of_detail: u32) {
-    self.reserve_and_set_internal(level_of_detail, ptr::null());
+  pub fn alloc(&self, level_of_detail: u32) {
+    self.alloc_and_set_internal(level_of_detail, ptr::null());
   }
 
-  fn reserve_and_set_internal(&self, level_of_detail: u32, data_ptr: *const T) {
+  fn alloc_and_set_internal(&self, level_of_detail: u32, data_ptr: *const T) {
     let size = self.texture.size_at_level_of_detail(level_of_detail);
     unsafe {
       self.ctx().raw_gl().TexImage2D(
