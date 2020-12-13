@@ -392,9 +392,8 @@ impl Game {
 
         self.update();
 
-        if cfg!(feature = "gl_debug_all_commands") {
-          println!("================ [OpenGL] ================");
-        }
+        #[cfg(feature = "gl_debug_all_commands")]
+        println!("================ [OpenGL] ================");
 
         self.render();
         self.window.gl_swap_window();

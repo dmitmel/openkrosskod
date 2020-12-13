@@ -162,6 +162,7 @@ impl Program {
   }
 
   pub fn request_attrib_location(&self, name: &str, location: u32) {
+    assert!(location < self.ctx.capabilities().max_vertex_attribs);
     let c_name = CString::new(name).unwrap();
     unsafe { self.raw_gl().BindAttribLocation(self.addr, location, c_name.as_ptr()) };
   }

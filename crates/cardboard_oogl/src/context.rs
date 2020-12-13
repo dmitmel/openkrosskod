@@ -317,7 +317,7 @@ macro_rules! generate_context_extensions_struct {
     }
 
     impl ContextExtensions {
-      fn new<'a, T: IntoIterator<Item = &'a str>>(loaded_extension_names_iter: T) -> Self {
+      fn new<'a>(loaded_extension_names_iter: impl IntoIterator<Item = &'a str>) -> Self {
         let mut extensions = ContextExtensions {
           $($field: false),*
         };
