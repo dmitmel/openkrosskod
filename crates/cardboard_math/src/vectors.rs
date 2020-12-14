@@ -9,17 +9,28 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::ops::*;
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Default, Deserialize, Serialize)]
 #[repr(C)]
 pub struct Vec2<T> {
   pub x: T,
   pub y: T,
 }
 
-impl<T: fmt::Debug> fmt::Debug for Vec2<T> {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    f.debug_tuple("Vec2").field(&self.x).field(&self.y).finish()
-  }
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Default, Deserialize, Serialize)]
+#[repr(C)]
+pub struct Vec3<T> {
+  pub x: T,
+  pub y: T,
+  pub z: T,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Default, Deserialize, Serialize)]
+#[repr(C)]
+pub struct Vec4<T> {
+  pub x: T,
+  pub y: T,
+  pub z: T,
+  pub w: T,
 }
 
 pub type Vec2d = Vec2<f64>;
@@ -41,252 +52,260 @@ pub type Vec2isize = Vec2<isize>;
 pub type Vec2f32 = Vec2<f32>;
 pub type Vec2f64 = Vec2<f64>;
 
-#[inline(always)]
-pub const fn vec2<T>(x: T, y: T) -> Vec2<T> { Vec2 { x, y } }
-
-#[cfg(not(feature = "const_fn"))]
-#[inline]
-pub fn vec2n<T: Copy>(n: T) -> Vec2<T> { Vec2 { x: n, y: n } }
-#[cfg(feature = "const_fn")]
-#[inline]
-pub const fn vec2n<T: Copy>(n: T) -> Vec2<T> { Vec2 { x: n, y: n } }
-
-impl<T> Vec2<T> {
-  #[inline]
-  pub fn from2<U>(v: Vec2<U>) -> Self
-  where
-    T: From<U>,
-  {
-    Self { x: T::from(v.x), y: T::from(v.y) }
-  }
-
-  #[inline]
-  pub fn into2<U>(self) -> Vec2<U>
-  where
-    T: Into<U>,
-  {
-    Vec2 { x: T::into(self.x), y: T::into(self.y) }
-  }
-
-  #[inline]
-  pub fn try_from2<U, E>(v: Vec2<U>) -> Result<Self, E>
-  where
-    T: TryFrom<U, Error = E>,
-  {
-    Ok(Self { x: T::try_from(v.x)?, y: T::try_from(v.y)? })
-  }
-
-  #[inline]
-  pub fn try_into2<U, E>(self) -> Result<Vec2<U>, E>
-  where
-    T: TryInto<U, Error = E>,
-  {
-    Ok(Vec2 { x: T::try_into(self.x)?, y: T::try_into(self.y)? })
-  }
-
-  #[inline(always)]
-  pub const fn new(x: T, y: T) -> Self { Self { x, y } }
-
-  #[inline]
-  pub fn map<U, F: FnMut(T) -> U>(self, mut op: F) -> Vec2<U> {
-    Vec2 { x: op(self.x), y: op(self.y) }
-  }
-
-  #[inline]
-  pub fn zip<U, V, F: FnMut(T, U) -> V>(self, other: Vec2<U>, mut op: F) -> Vec2<V> {
-    Vec2 { x: op(self.x, other.x), y: op(self.y, other.y) }
-  }
+// https://stackoverflow.com/a/60187870/12005228
+macro_rules! skip_first_tt {
+  ($head:tt $($rest: tt)*) => { $($rest)* };
 }
 
-impl<T> AsRef<[T; 2]> for Vec2<T> {
-  #[inline(always)]
-  fn as_ref(&self) -> &[T; 2] { unsafe { &*(self as *const _ as *const [T; 2]) } }
+macro_rules! impl_vec_shorthands {
+  ($shorthand_name:ident, $n_shorthand_name:ident, $VecTy:ident { $($field:ident),+ }) => {
+    #[inline(always)]
+    pub const fn $shorthand_name<T>($($field: T),+) -> $VecTy<T> { $VecTy { $($field),+ } }
+
+    #[cfg(not(feature = "const_fn"))]
+    #[inline(always)]
+    pub fn $n_shorthand_name<T: Copy>(n: T) -> $VecTy<T> { $VecTy { $($field: n),+ } }
+    #[cfg(feature = "const_fn")]
+    #[inline(always)]
+    pub const fn $n_shorthand_name<T: Copy>(n: T) -> $VecTy<T> { $VecTy { $($field: n),+ } }
+  };
 }
 
-impl<T> AsMut<[T; 2]> for Vec2<T> {
-  #[inline(always)]
-  fn as_mut(&mut self) -> &mut [T; 2] { unsafe { &mut *(self as *mut _ as *mut [T; 2]) } }
-}
+macro_rules! impl_vec_n {
+  ($fields:literal, $VecTy:ident { $($field:ident),+ }) => {
+    impl<T: fmt::Debug> fmt::Debug for $VecTy<T> {
+      fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple(stringify!($VecTy)) $(.field(&self.$field))+ .finish()
+      }
+    }
 
-macro_rules! impl_vec2_operator {
-  (unary, $ty:ty, $op:ident, fn $op_fn:ident($this:ident) $op_fn_body:block) => {
-    impl $op for Vec2<$ty> {
+    impl<T> $VecTy<T> {
+      #[inline(always)]
+      pub const fn new($($field: T),+) -> Self { Self { $($field),+ } }
+
+      #[inline]
+      pub fn from2<U>(v: $VecTy<U>) -> Self
+      where
+        T: From<U>,
+      {
+        Self { $($field: T::from(v.$field)),+ }
+      }
+
+      #[inline]
+      pub fn into2<U>(self) -> $VecTy<U>
+      where
+        T: Into<U>,
+      {
+        $VecTy { $($field: T::into(self.$field)),+ }
+      }
+
+      #[inline]
+      pub fn try_from2<U, E>(v: $VecTy<U>) -> Result<Self, E>
+      where
+        T: TryFrom<U, Error = E>,
+      {
+        Ok(Self { $($field: T::try_from(v.$field)?),+ })
+      }
+
+      #[inline]
+      pub fn try_into2<U, E>(self) -> Result<$VecTy<U>, E>
+      where
+        T: TryInto<U, Error = E>,
+      {
+        Ok($VecTy { $($field: T::try_into(self.$field)?),+ })
+      }
+
+      #[inline]
+      pub fn map<U, F: FnMut(T) -> U>(self, mut op: F) -> $VecTy<U> {
+        $VecTy { $($field: op(self.$field)),+ }
+      }
+
+      #[inline]
+      pub fn zip<U, V, F: FnMut(T, U) -> V>(self, other: $VecTy<U>, mut op: F) -> $VecTy<V> {
+        $VecTy { $($field: op(self.$field, other.$field)),+ }
+      }
+    }
+
+    impl<T> From<[T; $fields]> for $VecTy<T> {
+      #[inline(always)]
+      fn from([$($field),+]: [T; $fields]) -> Self { Self { $($field),+ } }
+    }
+
+    impl<T> From<$VecTy<T>> for [T; $fields] {
+      #[inline(always)]
+      fn from(v: $VecTy<T>) -> Self { [$(v.$field),+] }
+    }
+
+    impl<T> AsRef<[T; $fields]> for $VecTy<T> {
+      #[inline(always)]
+      fn as_ref(&self) -> &[T; $fields] {
+        unsafe { &*(self as *const _ as *const [T; $fields]) }
+      }
+    }
+
+    impl<T> AsMut<[T; $fields]> for $VecTy<T> {
+      #[inline(always)]
+      fn as_mut(&mut self) -> &mut [T; $fields] {
+        unsafe { &mut *(self as *mut _ as *mut [T; $fields]) }
+      }
+    }
+
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, u8);
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, i8, signed);
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, u16);
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, i16, signed);
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, u32);
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, i32, signed);
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, u64);
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, i64, signed);
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, u128);
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, i128, signed);
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, usize);
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, isize, signed);
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, f32, float);
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, f64, float);
+
+    impl<T> Lerp<Self, T> for $VecTy<T>
+    where
+      Self: Lerp<Output = Self>,
+      T: Copy,
+    {
       type Output = Self;
       #[inline]
-      fn $op_fn(self) -> Self::Output {
-        let $this = self;
-        $op_fn_body
-      }
+      fn lerp(self, rhs: Self, t: T) -> Self::Output { self.lerp(rhs, Self { $($field: t),+ }) }
     }
-  };
 
-  (binary, $ty:ty, $op:ident, fn $op_fn:ident($lhs:ident, $rhs:ident) $op_fn_body:block) => {
-    impl $op for Vec2<$ty> {
+    impl<T> Clamp2 for $VecTy<T>
+    where
+      T: Clamp2<Output = T>,
+    {
       type Output = Self;
       #[inline]
-      fn $op_fn(self, other: Self) -> Self::Output {
-        let ($lhs, $rhs) = (self, other);
-        $op_fn_body
+      fn clamp2(self, min: Self, max: Self) -> Self::Output {
+        Self { $($field: self.$field.clamp2(min.$field, max.$field)),+ }
       }
     }
-  };
 
-  (binary_scalar, $ty:ty, $op:ident, fn $op_fn:ident($lhs:ident, $rhs:ident) $op_fn_body:block) => {
-    impl $op<$ty> for Vec2<$ty> {
+    impl<T> Clamp2<T> for $VecTy<T>
+    where
+      Self: Clamp2<Output = Self>,
+      T: Copy,
+    {
       type Output = Self;
       #[inline]
-      fn $op_fn(self, other: $ty) -> Self::Output {
-        let ($lhs, $rhs) = (self, other);
-        $op_fn_body
+      fn clamp2(self, min: T, max: T) -> Self::Output {
+        self.clamp2(Self { $($field: min),+ }, Self { $($field: max),+ })
       }
     }
-    impl $op<Vec2<$ty>> for $ty {
-      type Output = Vec2<$ty>;
-      #[inline]
-      fn $op_fn(self, other: Vec2<$ty>) -> Self::Output {
-        let ($lhs, $rhs) = (other, self);
-        $op_fn_body
-      }
-    }
-  };
 
-  (binary_assign, $ty:ty, $op:ident, fn $op_fn:ident($lhs:ident, $rhs:ident) $op_fn_body:block) => {
-    impl $op for Vec2<$ty> {
+    impl<T, U> NumCastFrom<$VecTy<U>> for $VecTy<T>
+    where
+      T: NumCastFrom<U>,
+    {
       #[inline]
-      fn $op_fn(&mut self, other: Self) {
-        let (mut $lhs, $rhs) = (self, other);
-        $op_fn_body
-      }
-    }
-  };
-
-  (binary_scalar_assign, $ty:ty, $op:ident, fn $op_fn:ident($lhs:ident, $rhs:ident) $op_fn_body:block) => {
-    impl $op<$ty> for Vec2<$ty> {
-      #[inline]
-      fn $op_fn(&mut self, other: $ty) {
-        let (mut $lhs, $rhs) = (self, other);
-        $op_fn_body
+      fn cast_from(v: $VecTy<U>) -> Self {
+        Self { $($field: NumCastFrom::cast_from(v.$field)),+ }
       }
     }
   };
 }
 
-macro_rules! impl_vec2 {
-  ($ty:ty) => {
-    impl Vec2<$ty> {
-      pub const ONE: Self = vec2(1 as _, 1 as _);
-      pub const ZERO: Self = vec2(0 as _, 0 as _);
+macro_rules! impl_vec_n_for_t {
+  ($fields:literal, $VecTy:ident { $($field:ident),+ }, $NumTy:ident) => {
+    impl $VecTy<$NumTy> {
+      pub const ONE: Self = Self { $($field: 1 as _),+ };
+      pub const ZERO: Self = Self { $($field: 0 as _),+ };
 
       #[inline]
       pub fn is_zero(self) -> bool { self == Self::ZERO }
 
       #[inline]
-      pub fn sqr_magnitude(self) -> $ty { self.x * self.x + self.y * self.y }
+      pub fn sqr_magnitude(self) -> $NumTy { skip_first_tt!($(+ self.$field * self.$field)+) }
       #[inline]
-      pub fn sqr_distance(self, rhs: Self) -> $ty { (rhs - self).sqr_magnitude() }
+      pub fn sqr_distance(self, rhs: Self) -> $NumTy { (rhs - self).sqr_magnitude() }
       #[inline]
-      pub fn dot(self, rhs: Self) -> $ty { self.x * rhs.x + self.y * rhs.y }
+      pub fn dot(self, rhs: Self) -> $NumTy { skip_first_tt!($(+ self.$field * rhs.$field)+) }
 
       #[inline]
       pub fn min_components(self, rhs: Self) -> Self {
-        Self { x: self.x.min(rhs.x), y: self.y.min(rhs.y) }
+        Self { $($field: self.$field.min(rhs.$field)),+ }
       }
       #[inline]
       pub fn max_components(self, rhs: Self) -> Self {
-        Self { x: self.x.max(rhs.x), y: self.y.max(rhs.y) }
+        Self { $($field: self.$field.max(rhs.$field)),+ }
       }
 
       #[inline]
-      pub fn mul_components(self) -> $ty {
-        self.x * self.y
-      }
+      pub fn mul_components(self) -> $NumTy { skip_first_tt!($(+ self.$field)+) }
 
       #[inline]
       pub fn reflected_normal(self, normal: Self) -> Self {
-        self - (2 as $ty) * self.dot(normal) * normal
+        self - (2 as $NumTy) * self.dot(normal) * normal
       }
     }
 
-    impl_vec2_operator!(binary, $ty, Add, fn add(a, b) { Self { x: a.x + b.x, y: a.y + b.y } });
-    impl_vec2_operator!(binary, $ty, Sub, fn sub(a, b) { Self { x: a.x - b.x, y: a.y - b.y } });
-    impl_vec2_operator!(binary, $ty, Mul, fn mul(a, b) { Self { x: a.x * b.x, y: a.y * b.y } });
-    impl_vec2_operator!(binary, $ty, Div, fn div(a, b) { Self { x: a.x / b.x, y: a.y / b.y } });
-    impl_vec2_operator!(binary, $ty, Rem, fn rem(a, b) { Self { x: a.x % b.x, y: a.y % b.y } });
+    impl_vec_n_operator!(binary, $VecTy<$NumTy>, Add, fn add(a, b) { Self { $($field: a.$field + b.$field),+ } });
+    impl_vec_n_operator!(binary, $VecTy<$NumTy>, Sub, fn sub(a, b) { Self { $($field: a.$field - b.$field),+ } });
+    impl_vec_n_operator!(binary, $VecTy<$NumTy>, Mul, fn mul(a, b) { Self { $($field: a.$field * b.$field),+ } });
+    impl_vec_n_operator!(binary, $VecTy<$NumTy>, Div, fn div(a, b) { Self { $($field: a.$field / b.$field),+ } });
+    impl_vec_n_operator!(binary, $VecTy<$NumTy>, Rem, fn rem(a, b) { Self { $($field: a.$field % b.$field),+ } });
 
-    impl_vec2_operator!(binary_assign, $ty, AddAssign, fn add_assign(a, b) { a.x += b.x; a.y += b.y; });
-    impl_vec2_operator!(binary_assign, $ty, SubAssign, fn sub_assign(a, b) { a.x -= b.x; a.y -= b.y; });
-    impl_vec2_operator!(binary_assign, $ty, MulAssign, fn mul_assign(a, b) { a.x *= b.x; a.y *= b.y; });
-    impl_vec2_operator!(binary_assign, $ty, DivAssign, fn div_assign(a, b) { a.x /= b.x; a.y /= b.y; });
-    impl_vec2_operator!(binary_assign, $ty, RemAssign, fn rem_assign(a, b) { a.x %= b.x; a.y %= b.y; });
+    impl_vec_n_operator!(binary_assign, $VecTy<$NumTy>, AddAssign, fn add_assign(a, b) { $(a.$field += b.$field);+ });
+    impl_vec_n_operator!(binary_assign, $VecTy<$NumTy>, SubAssign, fn sub_assign(a, b) { $(a.$field -= b.$field);+ });
+    impl_vec_n_operator!(binary_assign, $VecTy<$NumTy>, MulAssign, fn mul_assign(a, b) { $(a.$field *= b.$field);+ });
+    impl_vec_n_operator!(binary_assign, $VecTy<$NumTy>, DivAssign, fn div_assign(a, b) { $(a.$field /= b.$field);+ });
+    impl_vec_n_operator!(binary_assign, $VecTy<$NumTy>, RemAssign, fn rem_assign(a, b) { $(a.$field %= b.$field);+ });
 
-    impl_vec2_operator!(binary_scalar, $ty, Mul, fn mul(v, s) { Vec2 { x: v.x * s, y: v.y * s } });
-    impl_vec2_operator!(binary_scalar, $ty, Div, fn div(v, s) { Vec2 { x: v.x / s, y: v.y / s } });
-    impl_vec2_operator!(binary_scalar, $ty, Rem, fn rem(v, s) { Vec2 { x: v.x % s, y: v.y % s } });
+    impl_vec_n_operator!(binary_scalar, $VecTy<$NumTy>, Mul, fn mul(v, s) { $VecTy { $($field: v.$field * s),+ } });
+    impl_vec_n_operator!(binary_scalar, $VecTy<$NumTy>, Div, fn div(v, s) { $VecTy { $($field: v.$field / s),+ } });
+    impl_vec_n_operator!(binary_scalar, $VecTy<$NumTy>, Rem, fn rem(v, s) { $VecTy { $($field: v.$field % s),+ } });
 
-    impl_vec2_operator!(binary_scalar_assign, $ty, MulAssign, fn mul_assign(v, s) { v.x *= s; v.y *= s; });
-    impl_vec2_operator!(binary_scalar_assign, $ty, DivAssign, fn div_assign(v, s) { v.x /= s; v.y /= s; });
-    impl_vec2_operator!(binary_scalar_assign, $ty, RemAssign, fn rem_assign(v, s) { v.x %= s; v.y %= s; });
+    impl_vec_n_operator!(binary_scalar_assign, $VecTy<$NumTy>, MulAssign, fn mul_assign(v, s) { $(v.$field *= s);+ });
+    impl_vec_n_operator!(binary_scalar_assign, $VecTy<$NumTy>, DivAssign, fn div_assign(v, s) { $(v.$field /= s);+ });
+    impl_vec_n_operator!(binary_scalar_assign, $VecTy<$NumTy>, RemAssign, fn rem_assign(v, s) { $(v.$field %= s);+ });
   };
 
-  ($ty:ty, signed) => {
-    impl_vec2!($ty);
-    impl_vec2_operator!(unary, $ty, Neg, fn neg(a) { Self { x: -a.x, y: -a.y } });
+  ($fields:literal, $VecTy:ident { $($field:ident),+ }, $NumTy:ident, signed) => {
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, $NumTy);
+    impl_vec_n_operator!(unary, $VecTy<$NumTy>, Neg, fn neg(a) { Self { $($field: -a.$field),+ } });
 
-    impl Vec2<$ty> {
-      pub const UP: Self = vec2(0 as _, 1 as _);
-      pub const RIGHT: Self = vec2(1 as _, 0 as _);
-      pub const DOWN: Self = vec2(0 as _, -1 as _);
-      pub const LEFT: Self = vec2(-1 as _, 0 as _);
-
+    impl $VecTy<$NumTy> {
       #[inline]
-      pub fn abs(self) -> Self { Self { x: self.x.abs(), y: self.y.abs() } }
+      pub fn abs(self) -> Self { Self { $($field: self.$field.abs()),+ } }
       #[inline]
-      pub fn signum(self) -> Self { Self { x: self.x.signum(), y: self.y.signum() } }
-
-      #[inline]
-      pub fn perpendicular_cw(self) -> Self { Self { x: self.y, y: -self.x } }
-      #[inline]
-      pub fn perpendicular_ccw(self) -> Self { Self { x: -self.y, y: self.x } }
-
-      #[inline]
-      pub fn angle_sign(self, rhs: Self) -> $ty { (self.x * rhs.y - self.y * rhs.x).signum() }
+      pub fn signum(self) -> Self { Self { $($field: self.$field.signum()),+ } }
     }
 
-    impl Clamp2Abs<$ty> for Vec2<$ty> {
+    impl Clamp2Abs<$NumTy> for $VecTy<$NumTy> {
       type Output = Self;
       #[inline]
-      fn clamp2_abs(self, max: $ty) -> Self::Output {
-        Self { x: self.x.clamp2_abs(max), y: self.y.clamp2_abs(max) }
+      fn clamp2_abs(self, max: $NumTy) -> Self::Output {
+        Self { $($field: self.$field.clamp2_abs(max)),+ }
       }
     }
   };
 
-  ($ty:ident, float) => {
-    impl_vec2!($ty, signed);
+  ($fields:literal, $VecTy:ident { $($field:ident),+ }, $NumTy:ident, float) => {
+    impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, $NumTy, signed);
 
-    impl Vec2<$ty> {
+    impl $VecTy<$NumTy> {
       #[inline]
-      pub fn magnitude(self) -> $ty { self.sqr_magnitude().sqrt() }
+      pub fn magnitude(self) -> $NumTy { self.sqr_magnitude().sqrt() }
       #[inline]
-      pub fn distance(self, rhs: Self) -> $ty { self.sqr_distance(rhs).sqrt() }
+      pub fn distance(self, rhs: Self) -> $NumTy { self.sqr_distance(rhs).sqrt() }
 
       #[inline]
       pub fn normalized(self) -> Self {
         let mag = self.magnitude();
-        if mag != 0.0 {
-          self / mag
-        } else {
-          self
-        }
+        if mag != 0.0 { self / mag } else { self }
       }
-
       #[inline]
       pub fn direction(self, towards: Self) -> Self { (self - towards).normalized() }
 
       #[inline]
-      pub fn with_magnitude(self, magnitude: $ty) -> Self { self.normalized() * magnitude }
+      pub fn with_magnitude(self, magnitude: $NumTy) -> Self { self.normalized() * magnitude }
       #[inline]
-      pub fn clamp_magnitude(self, max_magnitude: $ty) -> Self {
+      pub fn clamp_magnitude(self, max_magnitude: $NumTy) -> Self {
         let sqr_magnitude = self.sqr_magnitude();
         if sqr_magnitude > max_magnitude * max_magnitude {
           // NOTE: The minimum value of `max_magnitude * max_magnitude` is
@@ -297,19 +316,138 @@ macro_rules! impl_vec2 {
           self
         }
       }
+    }
+  };
+}
+
+macro_rules! impl_vec_n_operator {
+  (unary, $VecTy:ident<$NumTy:ident>, $op:ident, fn $op_fn:ident($this:ident) $op_fn_body:block) => {
+    impl $op for $VecTy<$NumTy> {
+      type Output = Self;
+      #[inline]
+      fn $op_fn(self) -> Self::Output {
+        let $this = self;
+        $op_fn_body
+      }
+    }
+  };
+
+  (binary, $VecTy:ident<$NumTy:ident>, $op:ident, fn $op_fn:ident($lhs:ident, $rhs:ident) $op_fn_body:block) => {
+    impl $op for $VecTy<$NumTy> {
+      type Output = Self;
+      #[inline]
+      fn $op_fn(self, other: Self) -> Self::Output {
+        let ($lhs, $rhs) = (self, other);
+        $op_fn_body
+      }
+    }
+  };
+
+  (binary_scalar, $VecTy:ident<$NumTy:ident>, $op:ident, fn $op_fn:ident($lhs:ident, $rhs:ident) $op_fn_body:block) => {
+    impl $op<$NumTy> for $VecTy<$NumTy> {
+      type Output = Self;
+      #[inline]
+      fn $op_fn(self, other: $NumTy) -> Self::Output {
+        let ($lhs, $rhs) = (self, other);
+        $op_fn_body
+      }
+    }
+    impl $op<$VecTy<$NumTy>> for $NumTy {
+      type Output = $VecTy<$NumTy>;
+      #[inline]
+      fn $op_fn(self, other: $VecTy<$NumTy>) -> Self::Output {
+        let ($lhs, $rhs) = (other, self);
+        $op_fn_body
+      }
+    }
+  };
+
+  (binary_assign, $VecTy:ident<$NumTy:ident>, $op:ident, fn $op_fn:ident($lhs:ident, $rhs:ident) $op_fn_body:block) => {
+    impl $op for $VecTy<$NumTy> {
+      #[inline]
+      fn $op_fn(&mut self, other: Self) {
+        let (mut $lhs, $rhs) = (self, other);
+        $op_fn_body
+      }
+    }
+  };
+
+  (binary_scalar_assign, $VecTy:ident<$NumTy:ident>, $op:ident, fn $op_fn:ident($lhs:ident, $rhs:ident) $op_fn_body:block) => {
+    impl $op<$NumTy> for $VecTy<$NumTy> {
+      #[inline]
+      fn $op_fn(&mut self, other: $NumTy) {
+        let (mut $lhs, $rhs) = (self, other);
+        $op_fn_body
+      }
+    }
+  };
+}
+
+macro_rules! impl_vec_n_tuple_conversions {
+  ($VecTy:ident { $($field:ident),+ }, $generic:ident, $tuple:ty) => {
+    impl<$generic> From<$tuple> for $VecTy<T> {
+      #[inline(always)]
+      fn from(($($field),+): $tuple) -> Self { Self { $($field),+ } }
+    }
+
+    impl<T> From<$VecTy<T>> for $tuple {
+      #[inline(always)]
+      fn from(v: $VecTy<T>) -> Self { ($(v.$field),+) }
+    }
+  };
+}
+
+impl_vec_shorthands!(vec2, vec2n, Vec2 { x, y });
+impl_vec_shorthands!(vec3, vec3n, Vec3 { x, y, z });
+impl_vec_shorthands!(vec4, vec4n, Vec4 { x, y, z, w });
+
+impl_vec_n!(2, Vec2 { x, y });
+impl_vec_n!(3, Vec3 { x, y, z });
+impl_vec_n!(4, Vec4 { x, y, z, w });
+
+impl_vec_n_tuple_conversions!(Vec2 { x, y }, T, (T, T));
+impl_vec_n_tuple_conversions!(Vec3 { x, y, z }, T, (T, T, T));
+impl_vec_n_tuple_conversions!(Vec4 { x, y, z, w }, T, (T, T, T, T));
+
+macro_rules! impl_vec2 {
+  ($NumTy:ident) => {};
+
+  ($NumTy:ident, signed) => {
+    impl Vec2<$NumTy> {
+      pub const UP: Self = vec2(0 as _, 1 as _);
+      pub const RIGHT: Self = vec2(1 as _, 0 as _);
+      pub const DOWN: Self = vec2(0 as _, -1 as _);
+      pub const LEFT: Self = vec2(-1 as _, 0 as _);
 
       #[inline]
-      pub fn angle_from_x_axis(self) -> $ty { self.y.atan2(self.x) }
+      pub fn perpendicular_cw(self) -> Self { Self { x: self.y, y: -self.x } }
+      #[inline]
+      pub fn perpendicular_ccw(self) -> Self { Self { x: -self.y, y: self.x } }
 
       #[inline]
-      pub fn angle_normalized(self, rhs: Self) -> $ty { self.dot(rhs).clamp2(-1.0, 1.0).acos() }
+      pub fn angle_sign(self, rhs: Self) -> $NumTy { (self.x * rhs.y - self.y * rhs.x).signum() }
+    }
+  };
+
+  ($NumTy:ident, float) => {
+    impl_vec2!($NumTy, signed);
+
+    // TODO: add the angles stuff to Vec3
+    impl Vec2<$NumTy> {
       #[inline]
-      pub fn signed_angle_normalized(self, rhs: Self) -> $ty {
+      pub fn angle_from_x_axis(self) -> $NumTy { self.y.atan2(self.x) }
+      #[inline]
+      pub fn rotated_from_x_axis(angle: $NumTy) -> Self { Self { x: angle.cos(), y: angle.sin() } }
+
+      #[inline]
+      pub fn angle_normalized(self, rhs: Self) -> $NumTy { self.dot(rhs).clamp2(-1.0, 1.0).acos() }
+      #[inline]
+      pub fn signed_angle_normalized(self, rhs: Self) -> $NumTy {
         self.angle_normalized(rhs) * self.angle_sign(rhs)
       }
 
       #[inline]
-      pub fn angle(self, rhs: Self) -> $ty {
+      pub fn angle(self, rhs: Self) -> $NumTy {
         let mag = (self.sqr_magnitude() * rhs.sqr_magnitude()).sqrt();
         if mag != 0.0 {
           (self.dot(rhs) / mag).clamp2(-1.0, 1.0).acos()
@@ -318,18 +456,13 @@ macro_rules! impl_vec2 {
         }
       }
       #[inline]
-      pub fn signed_angle(self, rhs: Self) -> $ty { self.angle(rhs) * self.angle_sign(rhs) }
+      pub fn signed_angle(self, rhs: Self) -> $NumTy { self.angle(rhs) * self.angle_sign(rhs) }
 
       #[inline]
-      pub fn rotated_from_x_axis(angle: $ty) -> Self { Self { x: angle.cos(), y: angle.sin() } }
-      #[inline]
-      pub fn rotated(self, angle: $ty) -> Self {
+      pub fn rotated(self, angle: $NumTy) -> Self {
         let s = angle.sin();
         let c = angle.cos();
-        Self {
-          x: c * self.x - s * self.y,
-          y: s * self.x + c * self.y,
-        }
+        Self { x: c * self.x - s * self.y, y: s * self.x + c * self.y }
       }
     }
   };
@@ -349,71 +482,3 @@ impl_vec2!(usize);
 impl_vec2!(isize, signed);
 impl_vec2!(f32, float);
 impl_vec2!(f64, float);
-
-impl<T> From<(T, T)> for Vec2<T> {
-  #[inline(always)]
-  fn from((x, y): (T, T)) -> Self { Self { x, y } }
-}
-
-impl<T> From<[T; 2]> for Vec2<T> {
-  #[inline(always)]
-  fn from([x, y]: [T; 2]) -> Self { Self { x, y } }
-}
-
-impl<T: Copy> From<T> for Vec2<T> {
-  #[inline(always)]
-  fn from(n: T) -> Self { Self { x: n, y: n } }
-}
-
-impl<T> Into<(T, T)> for Vec2<T> {
-  #[inline(always)]
-  fn into(self) -> (T, T) { (self.x, self.y) }
-}
-
-impl<T> Into<[T; 2]> for Vec2<T> {
-  #[inline(always)]
-  fn into(self) -> [T; 2] { [self.x, self.y] }
-}
-
-impl<T> Lerp<Self, T> for Vec2<T>
-where
-  Self: Lerp<Output = Self>,
-  T: Copy,
-{
-  type Output = Self;
-  #[inline]
-  fn lerp(self, rhs: Self, t: T) -> Self::Output { self.lerp(rhs, Self { x: t, y: t }) }
-}
-
-impl<T> Clamp2 for Vec2<T>
-where
-  T: Clamp2<Output = T>,
-{
-  type Output = Self;
-  #[inline]
-  fn clamp2(self, min: Self, max: Self) -> Self::Output {
-    Self { x: self.x.clamp2(min.x, max.x), y: self.y.clamp2(min.y, max.y) }
-  }
-}
-
-impl<T> Clamp2<T> for Vec2<T>
-where
-  Self: Clamp2<Output = Self>,
-  T: Copy,
-{
-  type Output = Self;
-  #[inline]
-  fn clamp2(self, min: T, max: T) -> Self::Output {
-    self.clamp2(Self { x: min, y: min }, Self { x: max, y: max })
-  }
-}
-
-impl<T, U> NumCastFrom<Vec2<U>> for Vec2<T>
-where
-  T: NumCastFrom<U>,
-{
-  #[inline]
-  fn cast_from(v: Vec2<U>) -> Self {
-    Self { x: NumCastFrom::cast_from(v.x), y: NumCastFrom::cast_from(v.y) }
-  }
-}
