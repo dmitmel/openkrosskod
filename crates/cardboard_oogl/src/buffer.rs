@@ -483,4 +483,6 @@ macro_rules! impl_attrib_ptr_type {
 
 impl_attrib_ptr_type!(f32, (F32, 1));
 impl_attrib_ptr_type!(Vec2<f32>, (F32, 2));
+impl_attrib_ptr_type!(Vec3<f32>, (F32, 3));
+impl_attrib_ptr_type!(Vec4<f32>, (F32, 4));
 impl_attrib_ptr_type!(Color<f32>, (F32, 4));

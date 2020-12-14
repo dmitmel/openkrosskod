@@ -485,13 +485,27 @@ macro_rules! impl_set_to_uniform {
 }
 
 impl_set_to_uniform!(f32, [Float], &x, Uniform1f(x));
-impl_set_to_uniform!(u32, [Int], &x, Uniform1i(x as i32));
+impl_set_to_uniform!(u32, [Int], &x, Uniform1i(x as _));
 impl_set_to_uniform!(i32, [Int], &x, Uniform1i(x));
-impl_set_to_uniform!(bool, [Bool], &x, Uniform1i(x as i32));
+impl_set_to_uniform!(bool, [Bool], &x, Uniform1i(x as _));
+
 impl_set_to_uniform!(Vec2<f32>, [Vec2], &Vec2 { x, y }, Uniform2f(x, y));
 impl_set_to_uniform!(Vec2<i32>, [IVec2], &Vec2 { x, y }, Uniform2i(x, y));
-impl_set_to_uniform!(Vec2<u32>, [IVec2], &Vec2 { x, y }, Uniform2i(x as i32, y as i32));
-impl_set_to_uniform!(Vec2<bool>, [BVec2], &Vec2 { x, y }, Uniform2i(x as i32, y as i32));
+impl_set_to_uniform!(Vec2<u32>, [IVec2], &Vec2 { x, y }, Uniform2i(x as _, y as _));
+impl_set_to_uniform!(Vec2<bool>, [BVec2], &Vec2 { x, y }, Uniform2i(x as _, y as _));
+
+impl_set_to_uniform!(Vec3<f32>, [Vec3], &Vec3 { x, y, z }, Uniform3f(x, y, z));
+impl_set_to_uniform!(Vec3<i32>, [IVec3], &Vec3 { x, y, z }, Uniform3i(x, y, z));
+impl_set_to_uniform!(Vec3<u32>, [IVec3], &Vec3 { x, y, z }, Uniform3i(x as _, y as _, z as _));
+impl_set_to_uniform!(Vec3<bool>, [BVec3], &Vec3 { x, y, z }, Uniform3i(x as _, y as _, z as _));
+
+impl_set_to_uniform!(Vec4<f32>, [Vec4], &Vec4 { x, y, z, w }, Uniform4f(x, y, z, w));
+impl_set_to_uniform!(Vec4<i32>, [IVec4], &Vec4 { x, y, z, w }, Uniform4i(x, y, z, w));
+#[rustfmt::skip]
+impl_set_to_uniform!(Vec4<u32>, [IVec4], &Vec4 { x, y, z, w }, Uniform4i(x as _, y as _, z as _, w as _));
+#[rustfmt::skip]
+impl_set_to_uniform!(Vec4<bool>, [BVec4], &Vec4 { x, y, z, w }, Uniform4i(x as _, y as _, z as _, w as _));
+
 impl_set_to_uniform!(Color<f32>, [Vec4], &Color { r, g, b, a }, Uniform4f(r, g, b, a));
 impl_set_to_uniform!(
   crate::TextureUnit,
@@ -632,6 +646,8 @@ macro_rules! impl_attrib_type {
 
 impl_attrib_type!(f32, [Float]);
 impl_attrib_type!(Vec2<f32>, [Vec2]);
+impl_attrib_type!(Vec3<f32>, [Vec3]);
+impl_attrib_type!(Vec4<f32>, [Vec4]);
 impl_attrib_type!(Color<f32>, [Vec4]);
 
 #[macro_export]
