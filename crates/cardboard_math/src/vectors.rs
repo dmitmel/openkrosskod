@@ -3,11 +3,12 @@
 // <https://github.com/rustgd/cgmath/blob/a691de871493f652836281e71e2c86c1eb5b50ca/src/macros.rs>
 // <https://github.com/rustgd/cgmath/blob/a691de871493f652836281e71e2c86c1eb5b50ca/src/structure.rs>
 
-use crate::ops::*;
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::ops::*;
+
+use crate::ops::*;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Default, Deserialize, Serialize)]
 #[repr(C)]
@@ -33,8 +34,12 @@ pub struct Vec4<T> {
   pub w: T,
 }
 
-pub type Vec2d = Vec2<f64>;
 pub type Vec2f = Vec2<f32>;
+pub type Vec2d = Vec2<f64>;
+pub type Vec3f = Vec3<f32>;
+pub type Vec3d = Vec3<f64>;
+pub type Vec4f = Vec4<f32>;
+pub type Vec4d = Vec4<f64>;
 
 pub type Vec2bool = Vec2<bool>;
 pub type Vec2u8 = Vec2<u8>;
@@ -54,7 +59,7 @@ pub type Vec2f64 = Vec2<f64>;
 
 // https://stackoverflow.com/a/60187870/12005228
 macro_rules! skip_first_tt {
-  ($head:tt $($rest: tt)*) => { $($rest)* };
+  ($head:tt $($rest:tt)*) => { $($rest)* };
 }
 
 macro_rules! impl_vec_shorthands {
@@ -263,6 +268,8 @@ macro_rules! impl_vec_n_for_t {
     impl_vec_n_operator!(binary_scalar_assign, $VecTy<$NumTy>, MulAssign, fn mul_assign(v, s) { $(v.$field *= s);+ });
     impl_vec_n_operator!(binary_scalar_assign, $VecTy<$NumTy>, DivAssign, fn div_assign(v, s) { $(v.$field /= s);+ });
     impl_vec_n_operator!(binary_scalar_assign, $VecTy<$NumTy>, RemAssign, fn rem_assign(v, s) { $(v.$field %= s);+ });
+
+    impl_vec_n_specific!($VecTy, $NumTy);
   };
 
   ($fields:literal, $VecTy:ident { $($field:ident),+ }, $NumTy:ident, signed) => {
@@ -283,6 +290,8 @@ macro_rules! impl_vec_n_for_t {
         Self { $($field: self.$field.clamp2_abs(max)),+ }
       }
     }
+
+    impl_vec_n_specific!($VecTy, $NumTy, signed);
   };
 
   ($fields:literal, $VecTy:ident { $($field:ident),+ }, $NumTy:ident, float) => {
@@ -317,6 +326,8 @@ macro_rules! impl_vec_n_for_t {
         }
       }
     }
+
+    impl_vec_n_specific!($VecTy, $NumTy, float);
   };
 }
 
@@ -397,28 +408,19 @@ macro_rules! impl_vec_n_tuple_conversions {
   };
 }
 
-impl_vec_shorthands!(vec2, vec2n, Vec2 { x, y });
-impl_vec_shorthands!(vec3, vec3n, Vec3 { x, y, z });
-impl_vec_shorthands!(vec4, vec4n, Vec4 { x, y, z, w });
+macro_rules! impl_vec_n_specific {
+  (Vec2, $NumTy:ident) => {};
 
-impl_vec_n!(2, Vec2 { x, y });
-impl_vec_n!(3, Vec3 { x, y, z });
-impl_vec_n!(4, Vec4 { x, y, z, w });
-
-impl_vec_n_tuple_conversions!(Vec2 { x, y }, T, (T, T));
-impl_vec_n_tuple_conversions!(Vec3 { x, y, z }, T, (T, T, T));
-impl_vec_n_tuple_conversions!(Vec4 { x, y, z, w }, T, (T, T, T, T));
-
-macro_rules! impl_vec2 {
-  ($NumTy:ident) => {};
-
-  ($NumTy:ident, signed) => {
+  (Vec2, $NumTy:ident, signed) => {
+#[rustfmt::skip]
     impl Vec2<$NumTy> {
-      pub const UP: Self = vec2(0 as _, 1 as _);
-      pub const RIGHT: Self = vec2(1 as _, 0 as _);
-      pub const DOWN: Self = vec2(0 as _, -1 as _);
-      pub const LEFT: Self = vec2(-1 as _, 0 as _);
+      pub const UP:    Self = vec2( 0 as _,  1 as _);
+      pub const DOWN:  Self = vec2( 0 as _, -1 as _);
+      pub const RIGHT: Self = vec2( 1 as _,  0 as _);
+      pub const LEFT:  Self = vec2(-1 as _,  0 as _);
+    }
 
+    impl Vec2<$NumTy> {
       #[inline]
       pub fn perpendicular_cw(self) -> Self { Self { x: self.y, y: -self.x } }
       #[inline]
@@ -429,15 +431,39 @@ macro_rules! impl_vec2 {
     }
   };
 
-  ($NumTy:ident, float) => {
-    impl_vec2!($NumTy, signed);
+  (Vec3, $NumTy:ident, signed) => {
+#[rustfmt::skip]
+    impl Vec3<$NumTy> {
+      pub const UP:       Self = vec3( 0 as _,  1 as _,  0 as _);
+      pub const DOWN:     Self = vec3( 0 as _, -1 as _,  0 as _);
+      pub const RIGHT:    Self = vec3( 1 as _,  0 as _,  0 as _);
+      pub const LEFT:     Self = vec3(-1 as _,  0 as _,  0 as _);
+      pub const FORWARD:  Self = vec3( 0 as _,  0 as _,  1 as _);
+      pub const BACKWARD: Self = vec3( 0 as _,  0 as _, -1 as _);
+    }
 
+    impl Vec3<$NumTy> {
+      #[inline]
+      pub fn cross(self, other: Self) -> Self {
+        Self {
+          x: (self.y * other.z) - (self.z * other.y),
+          y: (self.z * other.x) - (self.x * other.z),
+          z: (self.x * other.y) - (self.y * other.x),
+        }
+      }
+    }
+  };
+
+  (Vec2, $NumTy:ident, float) => {
     // TODO: add the angles stuff to Vec3
     impl Vec2<$NumTy> {
       #[inline]
       pub fn angle_from_x_axis(self) -> $NumTy { self.y.atan2(self.x) }
       #[inline]
-      pub fn rotated_from_x_axis(angle: $NumTy) -> Self { Self { x: angle.cos(), y: angle.sin() } }
+      pub fn rotated_from_x_axis(angle: $NumTy) -> Self {
+        let (y, x) = angle.sin_cos();
+        Self { x, y }
+      }
 
       #[inline]
       pub fn angle_normalized(self, rhs: Self) -> $NumTy { self.dot(rhs).clamp2(-1.0, 1.0).acos() }
@@ -460,25 +486,23 @@ macro_rules! impl_vec2 {
 
       #[inline]
       pub fn rotated(self, angle: $NumTy) -> Self {
-        let s = angle.sin();
-        let c = angle.cos();
+        let (s, c) = angle.sin_cos();
         Self { x: c * self.x - s * self.y, y: s * self.x + c * self.y }
       }
     }
   };
+
+  ($($anything:tt)*) => {};
 }
 
-impl_vec2!(u8);
-impl_vec2!(i8, signed);
-impl_vec2!(u16);
-impl_vec2!(i16, signed);
-impl_vec2!(u32);
-impl_vec2!(i32, signed);
-impl_vec2!(u64);
-impl_vec2!(i64, signed);
-impl_vec2!(u128);
-impl_vec2!(i128, signed);
-impl_vec2!(usize);
-impl_vec2!(isize, signed);
-impl_vec2!(f32, float);
-impl_vec2!(f64, float);
+impl_vec_shorthands!(vec2, vec2n, Vec2 { x, y });
+impl_vec_shorthands!(vec3, vec3n, Vec3 { x, y, z });
+impl_vec_shorthands!(vec4, vec4n, Vec4 { x, y, z, w });
+
+impl_vec_n!(2, Vec2 { x, y });
+impl_vec_n!(3, Vec3 { x, y, z });
+impl_vec_n!(4, Vec4 { x, y, z, w });
+
+impl_vec_n_tuple_conversions!(Vec2 { x, y }, T, (T, T));
+impl_vec_n_tuple_conversions!(Vec3 { x, y, z }, T, (T, T, T));
+impl_vec_n_tuple_conversions!(Vec4 { x, y, z, w }, T, (T, T, T, T));

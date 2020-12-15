@@ -514,6 +514,8 @@ impl_set_to_uniform!(
   Uniform1i(unit.id() as i32)
 );
 
+impl_set_to_uniform!(Mat4<f32>, [Mat4], m, UniformMatrix4fv(1, gl::FALSE, m.as_ref().as_ptr()));
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub struct GlslType {
   pub name: GlslTypeName,
