@@ -1,5 +1,5 @@
 use sdl2::event::{Event, WindowEvent};
-use sdl2::keyboard::Keycode;
+use sdl2::keyboard::Scancode;
 
 use cardboard_math::*;
 use cardboard_oogl::*;
@@ -114,7 +114,7 @@ fn main() {
   'running: loop {
     for event in event_pump.poll_iter() {
       match event {
-        Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
+        Event::Quit { .. } | Event::KeyDown { scancode: Some(Scancode::Escape), .. } => {
           break 'running;
         }
 
