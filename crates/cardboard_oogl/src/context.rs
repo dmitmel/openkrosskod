@@ -80,16 +80,23 @@ impl Context {
     self.active_texture_unit.set(unit);
   }
 
+  #[inline(always)]
   pub fn set_clear_color(&self, color: Colorf) {
     unsafe { self.raw_gl.ClearColor(color.r, color.g, color.b, color.a) };
   }
 
+  #[inline(always)]
+  pub fn set_clear_depth(&self, depth: f32) { unsafe { self.raw_gl.ClearDepthf(depth) }; }
+
+  #[inline(always)]
   pub fn clear(&self, flags: ClearFlags) { unsafe { self.raw_gl.Clear(flags.bits()) }; }
 
+  #[inline(always)]
   pub fn set_viewport(&self, pos: Vec2i32, size: Vec2i32) {
     unsafe { self.raw_gl.Viewport(pos.x, pos.y, size.x, size.y) };
   }
 
+  #[inline]
   unsafe fn set_feature_enabled(&self, feature: u32, enabled: bool) {
     if enabled {
       self.raw_gl.Enable(feature);
@@ -103,19 +110,59 @@ impl Context {
     unsafe { self.set_feature_enabled(gl::BLEND, enabled) };
   }
 
+  #[inline(always)]
   pub fn set_blending_factors(&self, src: BlendingFactor, dest: BlendingFactor) {
     unsafe { self.raw_gl.BlendFunc(src.as_raw(), dest.as_raw()) };
   }
 
+  #[inline(always)]
   pub fn set_blending_equation(&self, equation: BlendingEquation) {
     unsafe { self.raw_gl.BlendEquation(equation.as_raw()) };
   }
 
+  #[inline(always)]
   pub fn set_blending_color(&self, color: Colorf) {
     unsafe { self.raw_gl.BlendColor(color.r, color.g, color.b, color.a) };
   }
 
+  #[inline(always)]
   pub fn release_shader_compiler(&self) { unsafe { self.raw_gl.ReleaseShaderCompiler() }; }
+
+  #[inline(always)]
+  pub fn set_face_culling_enabled(&self, enabled: bool) {
+    unsafe { self.set_feature_enabled(gl::CULL_FACE, enabled) };
+  }
+
+  #[inline(always)]
+  pub fn set_front_face_winding(&self, winding: FrontFaceWinding) {
+    unsafe { self.raw_gl.FrontFace(winding.as_raw()) };
+  }
+
+  #[inline(always)]
+  pub fn set_face_culling_mode(&self, mode: FaceCullingMode) {
+    unsafe { self.raw_gl.CullFace(mode.as_raw()) };
+  }
+
+  #[inline(always)]
+  pub fn set_depth_test_enabled(&self, enabled: bool) {
+    unsafe { self.set_feature_enabled(gl::DEPTH_TEST, enabled) };
+  }
+
+  #[inline(always)]
+  pub fn set_depth_buffer_writable(&self, writable: bool) {
+    unsafe { self.raw_gl.DepthMask(writable as u8) };
+  }
+
+  #[inline(always)]
+  pub fn set_depth_range(&self, (near_value, far_value): (f32, f32)) {
+    // NOTE: values are clamped to the range [0, 1]
+    unsafe { self.raw_gl.DepthRangef(near_value, far_value) };
+  }
+
+  #[inline(always)]
+  pub fn set_depth_function(&self, func: DepthFunction) {
+    unsafe { self.raw_gl.DepthFunc(func.as_raw()) };
+  }
 }
 
 // TODO: Implement Debug properly with wrappers for non-debuggable stuff
@@ -423,3 +470,41 @@ impl TextureUnit {
 impl Drop for TextureUnit {
   fn drop(&mut self) { unsafe { &mut *self.ctx.free_texture_units.get() }.push(self.id); }
 }
+
+gl_enum!({
+  pub enum FrontFaceWinding {
+    Clockwise = CW,
+    CounterClockwise = CCW,
+  }
+});
+
+impl FrontFaceWinding {
+  pub fn opposite(self) -> Self {
+    use FrontFaceWinding::*;
+    match self {
+      Clockwise => CounterClockwise,
+      CounterClockwise => Clockwise,
+    }
+  }
+}
+
+gl_enum!({
+  pub enum FaceCullingMode {
+    Front = FRONT,
+    Back = BACK,
+    FrontAndBack = FRONT_AND_BACK,
+  }
+});
+
+gl_enum!({
+  pub enum DepthFunction {
+    Never = NEVER,
+    Less = LESS,
+    Equal = EQUAL,
+    LessOrEqual = LEQUAL,
+    Greater = GREATER,
+    NotEqual = NOTEQUAL,
+    GreaterOrEqual = GEQUAL,
+    Always = ALWAYS,
+  }
+});
