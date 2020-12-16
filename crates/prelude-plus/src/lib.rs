@@ -1,6 +1,7 @@
 // Is this re-export necessary?
 pub use std::prelude::v1::*;
 
+pub use std::borrow::{Borrow, BorrowMut, Cow};
 pub use std::cell::{Cell, Ref, RefCell, RefMut, UnsafeCell};
 pub use std::cmp;
 pub use std::collections::{
@@ -16,7 +17,9 @@ pub use std::io::{self, BufRead, BufReader, BufWriter, Read, Seek, Write};
 pub use std::iter::{self, FromIterator};
 pub use std::marker::PhantomData;
 pub use std::mem;
-pub use std::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
+pub use std::ops::{
+  Deref, DerefMut, Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive,
+};
 pub use std::os::raw::*;
 pub use std::path::{Path, PathBuf};
 pub use std::pin::Pin;

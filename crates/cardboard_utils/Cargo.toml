@@ -1,0 +1,8 @@
+[package]
+name = "cardboard_utils"
+version = "0.1.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+prelude-plus = { path = "../prelude-plus" }

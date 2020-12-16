@@ -16,6 +16,7 @@ homepage = "https://github.com/dmitmel/openkrosskod"
 prelude-plus = { path = "crates/prelude-plus" }
 cardboard_math = { path = "crates/cardboard_math", features = ["serde", "const_fn"] }
 cardboard_oogl = { path = "crates/cardboard_oogl" }
+cardboard_utils = { path = "crates/cardboard_utils" }
 
 sdl2 = "0.34.3"
 png = { version = "0.16.7", default-features = false }

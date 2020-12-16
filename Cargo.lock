@@ -70,6 +70,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cardboard_utils"
+version = "0.1.0"
+dependencies = [
+ "prelude-plus",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.62"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -275,6 +282,7 @@ version = "0.0.0"
 dependencies = [
  "cardboard_math",
  "cardboard_oogl",
+ "cardboard_utils",
  "env_logger",
  "nix",
  "num_cpus",

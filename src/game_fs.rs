@@ -37,7 +37,7 @@ impl GameFs {
   }
 
   fn _open_file(&self, relative_path: &Path) -> AnyResult<File> {
-    File::open(self.assets_dir.join(relative_path))
+    File::open(&self.assets_dir.join(&*cardboard_utils::path::normalize_separators(relative_path)))
       .with_context(|| format!("Failed to open file '{}'", relative_path.display()))
   }
 
