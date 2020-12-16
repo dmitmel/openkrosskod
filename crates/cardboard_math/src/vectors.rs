@@ -3,6 +3,7 @@
 // <https://github.com/rustgd/cgmath/blob/a691de871493f652836281e71e2c86c1eb5b50ca/src/macros.rs>
 // <https://github.com/rustgd/cgmath/blob/a691de871493f652836281e71e2c86c1eb5b50ca/src/structure.rs>
 
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
@@ -10,14 +11,16 @@ use std::ops::*;
 
 use crate::ops::*;
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Default, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[repr(C)]
 pub struct Vec2<T> {
   pub x: T,
   pub y: T,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Default, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[repr(C)]
 pub struct Vec3<T> {
   pub x: T,
@@ -25,7 +28,8 @@ pub struct Vec3<T> {
   pub z: T,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Default, Deserialize, Serialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[repr(C)]
 pub struct Vec4<T> {
   pub x: T,

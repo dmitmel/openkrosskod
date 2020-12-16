@@ -8,7 +8,7 @@ edition = "2018"
 sdl2 = "0.34.3"
 gl = { path = "../gl" }
 cardboard_math = { path = "../cardboard_math" }
-prelude-plus = { path = "../prelude-plus" }
+prelude-plus = { path = "../prelude-plus", features = ["log", "bitflags"] }
 
 [dev-dependencies]
 png = { version = "0.16.7", default-features = false }

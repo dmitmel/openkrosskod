@@ -39,9 +39,12 @@ pub use std::thread;
 pub use std::time::{self, Duration, Instant};
 pub use std::{f32, f64, str};
 
+#[cfg(feature = "anyhow")]
 pub use ::anyhow::{
   self, bail, ensure, format_err, Context as ResultContextExt, Error as AnyError,
   Result as AnyResult,
 };
+#[cfg(feature = "bitflags")]
+pub use ::bitflags::bitflags;
+#[cfg(feature = "log")]
 pub use ::log::{self, debug, error, info, log, log_enabled, trace, warn, Level as LogLevel};
-pub use bitflags::bitflags;

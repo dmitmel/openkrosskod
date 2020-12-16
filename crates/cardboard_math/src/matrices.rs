@@ -8,13 +8,15 @@
 // <https://github.com/rustgd/cgmath/blob/8e0d5ece92ddccd1cbd9670b2bf3007ca9ada986/src/macros.rs>
 // <https://github.com/rustgd/cgmath/blob/8e0d5ece92ddccd1cbd9670b2bf3007ca9ada986/src/structure.rs>
 
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::ops::*;
 
 use crate::vectors::*;
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[repr(C)]
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Default, Deserialize, Serialize)]
 pub struct Mat4<T> {
   pub x: Vec4<T>,
   pub y: Vec4<T>,
