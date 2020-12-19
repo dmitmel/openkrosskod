@@ -2,6 +2,9 @@
 #![deny(missing_debug_implementations)]
 #![allow(clippy::missing_safety_doc)]
 
+pub use gl as raw_gl;
+pub type RawGL = gl::Gles2;
+
 #[doc(hidden)]
 #[inline(never)]
 #[cold]

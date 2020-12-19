@@ -2,8 +2,6 @@ use crate::impl_prelude::*;
 use cardboard_math::*;
 use prelude_plus::*;
 
-pub type RawGL = Gles2;
-
 pub type SharedContext = Rc<Context>;
 impl Context {
   #[inline(always)]
@@ -40,7 +38,7 @@ impl Context {
     video_subsystem: &sdl2::VideoSubsystem,
     sdl_gl_context: sdl2::video::GLContext,
   ) -> Self {
-    let gl = Gles2::load_with(|name| video_subsystem.gl_get_proc_address(name) as *const c_void);
+    let gl = RawGL::load_with(|name| video_subsystem.gl_get_proc_address(name) as *const c_void);
 
     // This has to be done first!!!
     crate::debug::init(&gl);
