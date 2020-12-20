@@ -57,15 +57,6 @@ const BALL_MAX_SPEED: f32 = 1400.0;
 const BALL_MAX_VEL_DEVIATION_ANGLE: f32 = (/* 90 deg */f32::consts::FRAC_PI_2) * (2.0 / 3.0);
 const BALL_THROW_DISTANCE_FROM_RACKET: f32 = RACKET_SIZE.y;
 
-#[cfg(not(unix))]
-fn breakpoint() {}
-
-#[cfg(unix)]
-fn breakpoint() {
-  use nix::sys::signal;
-  signal::raise(signal::SIGINT).unwrap();
-}
-
 fn main() {
   if let Err(err) = try_main() {
     if log_enabled!(LogLevel::Error) {

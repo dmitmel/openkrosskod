@@ -48,3 +48,12 @@ pub use ::anyhow::{
 pub use ::bitflags::bitflags;
 #[cfg(feature = "log")]
 pub use ::log::{self, debug, error, info, log, log_enabled, trace, warn, Level as LogLevel};
+
+#[cfg_attr(not(feature = "breakpoint"), inline(always))]
+pub fn breakpoint() {
+  #[cfg(feature = "breakpoint")]
+  {
+    #[cfg(unix)]
+    nix::sys::signal::raise(nix::sys::signal::SIGINT).unwrap();
+  }
+}
