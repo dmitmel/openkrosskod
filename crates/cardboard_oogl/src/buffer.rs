@@ -16,6 +16,7 @@ pub struct VertexBuffer<T: Copy> {
   ctx: SharedContext,
   addr: u32,
 
+  usage_hint: BufferUsageHint,
   attribs: Vec<AttribPtr>,
   stride: u32,
   len: Cell<usize>,
@@ -41,7 +42,7 @@ impl<T: Copy> VertexBuffer<T> {
   #[inline(always)]
   pub fn stride(&self) -> u32 { self.stride }
 
-  pub fn new(ctx: SharedContext, attribs: Vec<AttribPtr>) -> Self {
+  pub fn new(ctx: SharedContext, usage_hint: BufferUsageHint, attribs: Vec<AttribPtr>) -> Self {
     let mut stride = 0;
     for attrib in &attribs {
       assert!(1 <= attrib.type_.len && attrib.type_.len <= 4);
@@ -53,7 +54,8 @@ impl<T: Copy> VertexBuffer<T> {
 
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenBuffers(1, &mut addr) };
-    let mut this = Self { ctx, addr, attribs, stride, len: Cell::new(0), phantom: PhantomData };
+    let mut this =
+      Self { ctx, addr, usage_hint, attribs, stride, len: Cell::new(0), phantom: PhantomData };
     drop(this.bind());
     this
   }
@@ -142,6 +144,7 @@ pub struct ElementBuffer<T: BufferIndex> {
   ctx: SharedContext,
   addr: u32,
 
+  usage_hint: BufferUsageHint,
   len: Cell<usize>,
 
   phantom: PhantomData<*mut T>,
@@ -160,10 +163,10 @@ unsafe impl<T: BufferIndex> Object for ElementBuffer<T> {
 }
 
 impl<T: BufferIndex> ElementBuffer<T> {
-  pub fn new(ctx: SharedContext) -> Self {
+  pub fn new(ctx: SharedContext, usage_hint: BufferUsageHint) -> Self {
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenBuffers(1, &mut addr) };
-    let mut this = Self { ctx, addr, len: Cell::new(0), phantom: PhantomData };
+    let mut this = Self { ctx, addr, usage_hint, len: Cell::new(0), phantom: PhantomData };
     drop(this.bind());
     this
   }
@@ -241,6 +244,7 @@ gl_enum!({
 });
 
 pub unsafe trait Buffer<T>: Object {
+  fn usage_hint(&self) -> BufferUsageHint;
   fn len(&self) -> usize;
   #[inline(always)]
   fn is_empty(&self) -> bool { self.len() == 0 }
@@ -250,12 +254,16 @@ pub unsafe trait Buffer<T>: Object {
 
 unsafe impl<T: Copy> Buffer<T> for VertexBuffer<T> {
   #[inline(always)]
+  fn usage_hint(&self) -> BufferUsageHint { self.usage_hint }
+  #[inline(always)]
   fn len(&self) -> usize { self.len.get() }
   #[inline(always)]
   unsafe fn __impl_set_len(&self, len: usize) { self.len.set(len) }
 }
 
 unsafe impl<T: BufferIndex> Buffer<T> for ElementBuffer<T> {
+  #[inline(always)]
+  fn usage_hint(&self) -> BufferUsageHint { self.usage_hint }
   #[inline(always)]
   fn len(&self) -> usize { self.len.get() }
   #[inline(always)]
@@ -274,13 +282,18 @@ where
   #[inline(always)]
   fn is_empty(&'obj self) -> bool { self.object().is_empty() }
 
-  fn alloc_and_set(&'obj self, usage_hint: BufferUsageHint, data: &[T]) {
-    unsafe { self.__impl_buffer_data(data.len(), data.as_ptr(), usage_hint) };
+  #[inline]
+  fn alloc_and_set(&'obj self, data: &[T]) {
+    unsafe { self.__impl_buffer_data(data.len(), data.as_ptr()) };
   }
 
-  fn alloc(&'obj self, usage_hint: BufferUsageHint, data_len: usize) {
-    unsafe { self.__impl_buffer_data(data_len, ptr::null(), usage_hint) };
+  #[inline]
+  fn alloc(&'obj self, data_len: usize) {
+    unsafe { self.__impl_buffer_data(data_len, ptr::null()) };
   }
+
+  #[inline]
+  fn orphan_data(&'obj self) { unsafe { self.__impl_buffer_data(self.len(), ptr::null()) }; }
 
   fn set(&'obj self, data: &[T]) {
     let self_len = self.len();
@@ -297,18 +310,13 @@ where
     unsafe { self.__impl_buffer_sub_data(offset, slice_len, data.as_ptr()) };
   }
 
-  unsafe fn __impl_buffer_data(
-    &'obj self,
-    len: usize,
-    data: *const T,
-    usage_hint: BufferUsageHint,
-  ) {
+  unsafe fn __impl_buffer_data(&'obj self, len: usize, data: *const T) {
     self.object().__impl_set_len(len);
     self.raw_gl().BufferData(
       Self::BIND_TARGET.as_raw(),
       isize::try_from(len * mem::size_of::<T>()).unwrap(),
       data as *const c_void,
-      usage_hint.as_raw(),
+      self.object().usage_hint().as_raw(),
     );
   }
 

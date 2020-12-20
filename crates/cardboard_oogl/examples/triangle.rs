@@ -68,13 +68,14 @@ fn main() {
 
   let mut vbo = VertexBuffer::<Vertex>::new(
     gl.share(),
+    BufferUsageHint::StaticDraw,
     vec![attr_pos.to_pointer_simple(), attr_color.to_pointer_simple()],
   );
 
   let bound_vbo = vbo.bind();
   bound_vbo.enable_attribs();
   bound_vbo.configure_attribs();
-  bound_vbo.alloc_and_set(BufferUsageHint::StaticDraw, VERTEX_DATA);
+  bound_vbo.alloc_and_set(VERTEX_DATA);
 
   gl.set_clear_color(color(0.0, 0.0, 0.0, 1.0));
 

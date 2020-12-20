@@ -54,6 +54,7 @@ impl Renderer {
 
     let mut vbo = oogl::VertexBuffer::new(
       globals.gl.share(),
+      oogl::BufferUsageHint::StaticDraw,
       // this attribute pointer will be the same for both programs because both
       // use the same vertex shader, as such the VBO can be shared
       vec![rectangle_program_reflection.a_pos.to_pointer(oogl::AttribPtrType {
@@ -68,8 +69,7 @@ impl Renderer {
       let bound_vbo = vbo.bind();
       bound_vbo.enable_attribs();
       bound_vbo.configure_attribs();
-      bound_vbo
-        .alloc_and_set(oogl::BufferUsageHint::StaticDraw, &[[-1, -1], [-1, 1], [1, 1], [1, -1]]);
+      bound_vbo.alloc_and_set(&[[-1, -1], [-1, 1], [1, 1], [1, -1]]);
     }
 
     let texture_unit = oogl::TextureUnit::new(globals.gl.share());
