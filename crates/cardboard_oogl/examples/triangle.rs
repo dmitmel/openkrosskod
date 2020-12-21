@@ -1,6 +1,7 @@
 use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Scancode;
 use sdl2::video::{GLProfile, Window};
+use std::ffi::c_void;
 use std::rc::Rc;
 
 use cardboard_math::*;
@@ -53,8 +54,9 @@ fn main() {
     .build()
     .unwrap();
 
-  let sdl_gl_ctx = window.gl_create_context().unwrap();
-  let gl = Rc::new(Context::load_with(&video_subsystem, sdl_gl_ctx));
+  let _sdl_gl_ctx = window.gl_create_context().unwrap();
+  let gl =
+    Rc::new(Context::load_with(|name| video_subsystem.gl_get_proc_address(name) as *const c_void));
 
   let mut event_pump = sdl_context.event_pump().unwrap();
 

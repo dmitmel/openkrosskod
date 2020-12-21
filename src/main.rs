@@ -122,7 +122,9 @@ fn try_main() -> AnyResult<()> {
     (GL_CONTEXT_PROFILE, GL_CONTEXT_VERSION)
   );
 
-  let gl = Rc::new(oogl::Context::load_with(&video_subsystem, sdl_gl_ctx));
+  let gl = Rc::new(oogl::Context::load_with(|name| {
+    video_subsystem.gl_get_proc_address(name) as *const c_void
+  }));
   debug!("{:?}", gl.capabilities());
 
   gl.set_clear_color(BACKGROUND_COLOR);
@@ -187,6 +189,7 @@ fn try_main() -> AnyResult<()> {
 
     sdl_context,
     video_subsystem,
+    sdl_gl_ctx,
     window,
     event_pump,
     renderer,
@@ -337,6 +340,7 @@ struct Game {
 
   pub sdl_context: sdl2::Sdl,
   pub video_subsystem: sdl2::VideoSubsystem,
+  pub sdl_gl_ctx: sdl2::video::GLContext,
   pub window: Window,
   pub event_pump: EventPump,
   pub renderer: Renderer,

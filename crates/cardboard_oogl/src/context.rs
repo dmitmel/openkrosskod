@@ -10,7 +10,6 @@ impl Context {
 
 pub struct Context {
   raw_gl: RawGL,
-  sdl_gl_context: sdl2::video::GLContext,
   capabilities: ContextCapabilities,
 
   pub(crate) bound_program: BindingTarget<ProgramBindingTarget>,
@@ -30,15 +29,10 @@ impl Context {
   #[inline(always)]
   pub fn raw_gl(&self) -> &RawGL { &self.raw_gl }
   #[inline(always)]
-  pub fn sdl_gl_context(&self) -> &sdl2::video::GLContext { &self.sdl_gl_context }
-  #[inline(always)]
   pub fn capabilities(&self) -> &ContextCapabilities { &self.capabilities }
 
-  pub fn load_with(
-    video_subsystem: &sdl2::VideoSubsystem,
-    sdl_gl_context: sdl2::video::GLContext,
-  ) -> Self {
-    let gl = RawGL::load_with(|name| video_subsystem.gl_get_proc_address(name) as *const c_void);
+  pub fn load_with(fn_loader: impl FnMut(&'static str) -> *const c_void) -> Self {
+    let gl = RawGL::load_with(fn_loader);
 
     // This has to be done first!!!
     crate::debug::init(&gl);
@@ -54,7 +48,6 @@ impl Context {
 
     Self {
       raw_gl: gl,
-      sdl_gl_context,
       capabilities,
 
       // programs are a special case, the binding target value doesn't matter
@@ -161,13 +154,22 @@ impl Context {
   pub fn set_depth_function(&self, func: DepthFunction) {
     unsafe { self.raw_gl.DepthFunc(func.as_raw()) };
   }
+
+  #[inline]
+  pub fn set_color_mask(&self, mask: ColorMask) {
+    unsafe {
+      self.raw_gl.ColorMask(
+        mask.contains(ColorMask::RED) as u8,
+        mask.contains(ColorMask::GREEN) as u8,
+        mask.contains(ColorMask::BLUE) as u8,
+        mask.contains(ColorMask::ALPHA) as u8,
+      )
+    }
+  }
 }
 
-// TODO: Implement Debug properly with wrappers for non-debuggable stuff
 impl fmt::Debug for Context {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "Context#<{:p}>", unsafe { self.sdl_gl_context.raw() })
-  }
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.debug_struct("Context").finish() }
 }
 
 #[derive(Debug)]
@@ -506,3 +508,12 @@ gl_enum!({
     Always = ALWAYS,
   }
 });
+
+bitflags! {
+  pub struct ColorMask: u8 {
+    const RED   = 1 << 0;
+    const GREEN = 1 << 2;
+    const BLUE  = 1 << 3;
+    const ALPHA = 1 << 4;
+  }
+}

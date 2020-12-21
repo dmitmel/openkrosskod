@@ -1,4 +1,5 @@
 use sdl2::video::{GLProfile, Window};
+use std::ffi::c_void;
 use std::io::Read;
 use std::rc::Rc;
 
@@ -12,7 +13,14 @@ fn main() {}
 pub fn prepare_example_gl_context(
   example_name: &'static str,
   window_size: Vec2u32,
-) -> (sdl2::Sdl, sdl2::VideoSubsystem, Window, sdl2::EventPump, SharedContext) {
+) -> (
+  sdl2::Sdl,
+  sdl2::VideoSubsystem,
+  sdl2::video::GLContext,
+  Window,
+  sdl2::EventPump,
+  SharedContext,
+) {
   let sdl_context = sdl2::init().unwrap();
   let video_subsystem = sdl_context.video().unwrap();
 
@@ -30,11 +38,12 @@ pub fn prepare_example_gl_context(
     .unwrap();
 
   let sdl_gl_ctx = window.gl_create_context().unwrap();
-  let gl = Rc::new(Context::load_with(&video_subsystem, sdl_gl_ctx));
+  let gl =
+    Rc::new(Context::load_with(|name| video_subsystem.gl_get_proc_address(name) as *const c_void));
 
   let event_pump = sdl_context.event_pump().unwrap();
 
-  (sdl_context, video_subsystem, window, event_pump, gl)
+  (sdl_context, video_subsystem, sdl_gl_ctx, window, event_pump, gl)
 }
 
 pub fn reset_gl_viewport(gl: &Context, window: &Window) {

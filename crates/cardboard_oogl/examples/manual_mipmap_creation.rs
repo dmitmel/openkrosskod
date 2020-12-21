@@ -43,7 +43,7 @@ static FS_SRC: &str = r#"#version 100
 
 fn main() {
   eprintln!("Try resizing the window");
-  let (_sdl_context, _video_subsystem, window, mut event_pump, gl) =
+  let (_sdl_context, _video_subsystem, _sdl_gl_ctx, window, mut event_pump, gl) =
     common::prepare_example_gl_context("manual_mipmap_creation", vec2(800, 600));
 
   let vs = common::compile_shader(gl.share(), VS_SRC, ShaderType::Vertex);

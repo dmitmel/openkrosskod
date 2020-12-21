@@ -5,7 +5,6 @@ publish = false
 edition = "2018"
 
 [dependencies]
-sdl2 = "0.34.3"
 gl = { path = "../gl" }
 cardboard_math = { path = "../cardboard_math" }
 prelude-plus = { path = "../prelude-plus", features = ["log", "bitflags"] }
@@ -13,6 +12,7 @@ prelude-plus = { path = "../prelude-plus", features = ["log", "bitflags"] }
 [dev-dependencies]
 png = { version = "0.16.7", default-features = false }
 jpeg-decoder = { version = "0.1.20", default-features = false }
+sdl2 = "0.34.3"
 
 [features]
 debug_all_commands = ["gl/debug_all_commands"]
