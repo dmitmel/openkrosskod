@@ -34,4 +34,3 @@ env_logger = { version = "0.8.1", default-features = false, features = ["termcol
 
 [features]
 gl_debug_all_commands = ["cardboard_oogl/debug_all_commands"]
-simd_json = ["simd-json"]

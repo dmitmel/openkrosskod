@@ -1,13 +1,13 @@
 // TODO: handle errors
 
-#[cfg(not(feature = "simd_json"))]
+#[cfg(not(feature = "simd-json"))]
 use serde_json as json;
-#[cfg(not(feature = "simd_json"))]
+#[cfg(not(feature = "simd-json"))]
 use serde_json::Value as JsonStruct;
 
-#[cfg(feature = "simd_json")]
+#[cfg(feature = "simd-json")]
 use simd_json as json;
-#[cfg(feature = "simd_json")]
+#[cfg(feature = "simd-json")]
 use simd_json::OwnedValue as JsonStruct;
 
 use prelude_plus::*;
