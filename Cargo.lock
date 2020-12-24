@@ -48,8 +48,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
 
 [[package]]
+name = "cardboard_coal"
+version = "0.0.0"
+dependencies = [
+ "cardboard_math",
+ "prelude-plus",
+]
+
+[[package]]
 name = "cardboard_math"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "cfg-if 1.0.0",
  "getrandom",
@@ -59,7 +67,7 @@ dependencies = [
 
 [[package]]
 name = "cardboard_oogl"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "cardboard_math",
  "gl",
@@ -71,7 +79,7 @@ dependencies = [
 
 [[package]]
 name = "cardboard_utils"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "prelude-plus",
 ]
@@ -280,6 +288,7 @@ checksum = "0ab1bc2a289d34bd04a330323ac98a1b4bc82c9d9fcb1e66b63caa84da26b575"
 name = "openkrosskod"
 version = "0.0.0"
 dependencies = [
+ "cardboard_coal",
  "cardboard_math",
  "cardboard_oogl",
  "cardboard_utils",
@@ -306,7 +315,7 @@ dependencies = [
 
 [[package]]
 name = "prelude-plus"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "bitflags",

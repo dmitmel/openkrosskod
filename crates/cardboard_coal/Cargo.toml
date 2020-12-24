@@ -1,0 +1,10 @@
+[package]
+name = "cardboard_coal"
+version = "0.0.0"
+publish = false
+edition = "2018"
+description = "Cardboard Engine: Cross-platform Object-oriented Audio Library"
+
+[dependencies]
+cardboard_math = { path = "../cardboard_math" }
+prelude-plus = { path = "../prelude-plus" }

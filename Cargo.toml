@@ -14,6 +14,8 @@ homepage = "https://github.com/dmitmel/openkrosskod"
 # TODO: crate-type = ["dylib"]
 [dependencies]
 prelude-plus = { path = "crates/prelude-plus", features = ["log", "anyhow"] }
+
+cardboard_coal = { path = "crates/cardboard_coal" }
 cardboard_math = { path = "crates/cardboard_math", features = ["serde", "const_fn"] }
 cardboard_oogl = { path = "crates/cardboard_oogl" }
 cardboard_utils = { path = "crates/cardboard_utils" }
