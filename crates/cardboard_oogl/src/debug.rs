@@ -72,12 +72,7 @@ extern "system" fn internal_debug_message_callback(
   );
 }
 
-pub(crate) unsafe fn set_object_debug_label(
-  ctx: &Context,
-  type_identifier: u32,
-  addr: u32,
-  label: &[u8],
-) {
+pub(crate) unsafe fn set_object_debug_label(ctx: &Context, type_id: u32, addr: u32, label: &[u8]) {
   let gl = ctx.raw_gl();
   if gl.ObjectLabel.is_loaded() {
     let label_len = i32::try_from(label.len()).unwrap();
@@ -85,15 +80,11 @@ pub(crate) unsafe fn set_object_debug_label(
 
     // TODO: Check that the label doesn't contain any NUL characters
 
-    gl.ObjectLabel(type_identifier, addr, label_len, label.as_ptr() as *const c_char);
+    gl.ObjectLabel(type_id, addr, label_len, label.as_ptr() as *const c_char);
   }
 }
 
-pub(crate) unsafe fn get_object_debug_label(
-  ctx: &Context,
-  type_identifier: u32,
-  addr: u32,
-) -> Vec<u8> {
+pub(crate) unsafe fn get_object_debug_label(ctx: &Context, type_id: u32, addr: u32) -> Vec<u8> {
   let gl = ctx.raw_gl();
   if gl.GetObjectLabel.is_loaded() {
     let buf_size =
@@ -103,7 +94,7 @@ pub(crate) unsafe fn get_object_debug_label(
     let mut buf: Vec<u8> = Vec::with_capacity(buf_size as usize);
     let mut text_len: i32 = 0;
 
-    gl.GetObjectLabel(type_identifier, addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut i8);
+    gl.GetObjectLabel(type_id, addr, buf_size, &mut text_len, buf.as_mut_ptr() as *mut c_char);
     buf.set_len(text_len as usize);
 
     buf

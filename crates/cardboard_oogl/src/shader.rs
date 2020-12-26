@@ -21,7 +21,7 @@ impl !Send for Shader {}
 impl !Sync for Shader {}
 
 unsafe impl Object for Shader {
-  const DEBUG_TYPE_IDENTIFIER: u32 = gl::SHADER;
+  const DEBUG_TYPE_ID: u32 = gl::SHADER;
 
   #[inline(always)]
   fn ctx(&self) -> &SharedContext { &self.ctx }
@@ -118,7 +118,7 @@ pub const INACTIVE_ATTRIB_LOCATION: u32 = -1_i32 as u32;
 const ARRAY_NAME_MARKER: &str = "[0]";
 
 unsafe impl Object for Program {
-  const DEBUG_TYPE_IDENTIFIER: u32 = gl::PROGRAM;
+  const DEBUG_TYPE_ID: u32 = gl::PROGRAM;
 
   #[inline(always)]
   fn ctx(&self) -> &SharedContext { &self.ctx }

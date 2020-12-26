@@ -17,7 +17,7 @@ impl !Send for Framebuffer {}
 impl !Sync for Framebuffer {}
 
 unsafe impl Object for Framebuffer {
-  const DEBUG_TYPE_IDENTIFIER: u32 = gl::FRAMEBUFFER;
+  const DEBUG_TYPE_ID: u32 = gl::FRAMEBUFFER;
 
   #[inline(always)]
   fn ctx(&self) -> &SharedContext { &self.ctx }

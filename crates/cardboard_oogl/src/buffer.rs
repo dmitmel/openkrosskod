@@ -28,7 +28,7 @@ impl<T> !Send for VertexBuffer<T> {}
 impl<T> !Sync for VertexBuffer<T> {}
 
 unsafe impl<T: Copy> Object for VertexBuffer<T> {
-  const DEBUG_TYPE_IDENTIFIER: u32 = gl::BUFFER;
+  const DEBUG_TYPE_ID: u32 = gl::BUFFER;
 
   #[inline(always)]
   fn ctx(&self) -> &SharedContext { &self.ctx }
@@ -154,7 +154,7 @@ impl<T: BufferIndex> !Send for ElementBuffer<T> {}
 impl<T: BufferIndex> !Sync for ElementBuffer<T> {}
 
 unsafe impl<T: BufferIndex> Object for ElementBuffer<T> {
-  const DEBUG_TYPE_IDENTIFIER: u32 = gl::BUFFER;
+  const DEBUG_TYPE_ID: u32 = gl::BUFFER;
 
   #[inline(always)]
   fn ctx(&self) -> &SharedContext { &self.ctx }

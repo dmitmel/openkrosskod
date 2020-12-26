@@ -27,7 +27,7 @@ impl<T: TextureDataType> !Send for Texture2D<T> {}
 impl<T: TextureDataType> !Sync for Texture2D<T> {}
 
 unsafe impl<T: TextureDataType> Object for Texture2D<T> {
-  const DEBUG_TYPE_IDENTIFIER: u32 = gl::TEXTURE;
+  const DEBUG_TYPE_ID: u32 = gl::TEXTURE;
 
   #[inline(always)]
   fn ctx(&self) -> &SharedContext { &self.ctx }
