@@ -1,5 +1,6 @@
 use crate::impl_prelude::*;
 use crate::CorrespondingAttribPtrType;
+use crate::TextureUnit;
 use cardboard_math::*;
 use prelude_plus::*;
 
@@ -146,7 +147,7 @@ impl Program {
     }
   }
 
-  pub fn bind(&'_ mut self) -> ProgramBinding<'_> {
+  pub fn bind(&mut self) -> ProgramBinding<'_> {
     let binding_target = &self.ctx.bound_program;
     binding_target.on_binding_created(self.addr);
     binding_target.bind_if_needed(self.raw_gl(), self.addr);
@@ -488,6 +489,7 @@ impl_set_to_uniform!(f32, [Float], &x, Uniform1f(x));
 impl_set_to_uniform!(u32, [Int], &x, Uniform1i(x as _));
 impl_set_to_uniform!(i32, [Int], &x, Uniform1i(x));
 impl_set_to_uniform!(bool, [Bool], &x, Uniform1i(x as _));
+impl_set_to_uniform!(TextureUnit, [Sampler2D, SamplerCube], &x, Uniform1i(x as _));
 
 impl_set_to_uniform!(Vec2<f32>, [Vec2], &Vec2 { x, y }, Uniform2f(x, y));
 impl_set_to_uniform!(Vec2<i32>, [IVec2], &Vec2 { x, y }, Uniform2i(x, y));
@@ -507,12 +509,6 @@ impl_set_to_uniform!(Vec4<u32>, [IVec4], &Vec4 { x, y, z, w }, Uniform4i(x as _,
 impl_set_to_uniform!(Vec4<bool>, [BVec4], &Vec4 { x, y, z, w }, Uniform4i(x as _, y as _, z as _, w as _));
 
 impl_set_to_uniform!(Color<f32>, [Vec4], &Color { r, g, b, a }, Uniform4f(r, g, b, a));
-impl_set_to_uniform!(
-  crate::TextureUnit,
-  [Sampler2D, SamplerCube],
-  unit,
-  Uniform1i(unit.id() as i32)
-);
 
 impl_set_to_uniform!(Mat4<f32>, [Mat4], m, UniformMatrix4fv(1, gl::FALSE, m.as_ref().as_ptr()));
 

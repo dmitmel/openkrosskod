@@ -88,7 +88,11 @@ pub fn link_program(gl: SharedContext, vertex: &Shader, fragment: &Shader) -> Pr
 }
 
 #[allow(dead_code)]
-pub fn load_png_texture_2d(gl: SharedContext, encoded_data: impl Read) -> Texture2D {
+pub fn load_png_texture_2d(
+  gl: SharedContext,
+  texture_unit_preference: Option<TextureUnit>,
+  encoded_data: impl Read,
+) -> Texture2D {
   let decoder = png::Decoder::new(encoded_data);
   let (info, mut reader) = decoder.read_info().unwrap();
   let mut buf = vec![0; info.buffer_size()];
@@ -97,10 +101,9 @@ pub fn load_png_texture_2d(gl: SharedContext, encoded_data: impl Read) -> Textur
   assert!(info.bit_depth == png::BitDepth::Eight);
   assert!(info.color_type == png::ColorType::RGBA);
 
-  let texture_unit = TextureUnit::new(gl.share());
-  let mut texture = Texture2D::new(gl, &texture_unit, TextureInputFormat::RGBA, None);
+  let mut texture = Texture2D::new(gl, texture_unit_preference, TextureInputFormat::RGBA, None);
   {
-    let bound_texture = texture.bind(&texture_unit);
+    let bound_texture = texture.bind(None);
     bound_texture.set_size(vec2(info.width, info.height));
     bound_texture.alloc_and_set(0, &buf);
   }
@@ -109,17 +112,20 @@ pub fn load_png_texture_2d(gl: SharedContext, encoded_data: impl Read) -> Textur
 }
 
 #[allow(dead_code)]
-pub fn load_jpeg_texture_2d(gl: SharedContext, encoded_data: impl Read) -> Texture2D {
+pub fn load_jpeg_texture_2d(
+  gl: SharedContext,
+  texture_unit_preference: Option<TextureUnit>,
+  encoded_data: impl Read,
+) -> Texture2D {
   let mut decoder = jpeg_decoder::Decoder::new(encoded_data);
   let buf = decoder.decode().unwrap();
   let info = decoder.info().unwrap();
 
   assert!(info.pixel_format == jpeg_decoder::PixelFormat::RGB24);
 
-  let texture_unit = TextureUnit::new(gl.share());
-  let mut texture = Texture2D::new(gl, &texture_unit, TextureInputFormat::RGB, None);
+  let mut texture = Texture2D::new(gl, texture_unit_preference, TextureInputFormat::RGB, None);
   {
-    let bound_texture = texture.bind(&texture_unit);
+    let bound_texture = texture.bind(texture_unit_preference);
     bound_texture.set_size(vec2(info.width as u32, info.height as u32));
     bound_texture.alloc_and_set(0, &buf);
   }

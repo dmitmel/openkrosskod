@@ -1,7 +1,8 @@
 use crate::impl_prelude::*;
-use crate::TextureUnit;
 use cardboard_math::*;
 use prelude_plus::*;
+
+pub type TextureUnit = u16;
 
 gl_enum!({
   pub enum BindTextureTarget {
@@ -45,7 +46,7 @@ impl<T: TextureDataType> Texture2D<T> {
 
   pub fn new(
     ctx: SharedContext,
-    unit: &TextureUnit,
+    unit_preference: Option<TextureUnit>,
     input_format: TextureInputFormat,
     internal_format_preference: Option<TextureInternalFormat>,
   ) -> Self {
@@ -64,7 +65,7 @@ impl<T: TextureDataType> Texture2D<T> {
 
       phantom: PhantomData,
     };
-    drop(this.bind(&unit));
+    drop(this.bind(unit_preference));
     this
   }
 
@@ -77,20 +78,24 @@ impl<T: TextureDataType> Texture2D<T> {
 
   pub fn levels_of_detail_count(&self) -> u32 { self.levels_of_detail_count.get() }
 
-  pub fn bind(&'_ mut self, unit: &TextureUnit) -> Texture2DBinding<'_, T> {
+  pub fn bind(&mut self, unit_preference: Option<TextureUnit>) -> Texture2DBinding<'_, T> {
+    #[allow(clippy::or_fun_call)]
+    let unit = unit_preference.unwrap_or(self.ctx.active_texture_unit());
+    assert!(unit < self.ctx.capabilities().max_texture_units);
+
     let binding_target = &self.ctx.bound_texture_2d;
     binding_target.on_binding_created(self.addr);
 
     let different_texture_was_bound = binding_target.bound_addr() != self.addr;
-    let different_unit_was_selected = self.ctx.active_texture_unit() != unit.id();
+    let different_unit_was_selected = self.ctx.active_texture_unit() != unit;
 
     if different_unit_was_selected {
-      unsafe { self.ctx.set_active_texture_unit(unit.id()) };
+      unsafe { self.ctx.set_active_texture_unit(unit) };
     }
     if different_texture_was_bound || different_unit_was_selected {
       binding_target.bind_unconditionally(self.raw_gl(), self.addr);
     }
-    Texture2DBinding { texture: self }
+    Texture2DBinding { texture: self, unit }
   }
 }
 
@@ -109,6 +114,7 @@ impl TextureDataType for u8 {
 #[derive(Debug)]
 pub struct Texture2DBinding<'obj, T: TextureDataType = u8> {
   texture: &'obj mut Texture2D<T>,
+  unit: TextureUnit,
 }
 
 unsafe impl<'obj, T> ObjectBinding<'obj, Texture2D<T>> for Texture2DBinding<'obj, T>
@@ -119,6 +125,11 @@ where
   fn object(&self) -> &Texture2D<T> { &self.texture }
 
   fn unbind_completely(self) { self.ctx().bound_texture_2d.unbind_unconditionally(self.raw_gl()); }
+}
+
+impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
+  #[inline(always)]
+  pub fn unit(&self) -> TextureUnit { self.unit }
 }
 
 impl<'obj, T: TextureDataType> Drop for Texture2DBinding<'obj, T> {

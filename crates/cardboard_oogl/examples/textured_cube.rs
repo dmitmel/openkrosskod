@@ -52,13 +52,11 @@ fn main() {
   bound_vbo.configure_attribs();
   bound_vbo.alloc_and_set(VERTEX_DATA);
 
-  let texture_unit = TextureUnit::new(gl.share());
-  uni_texture.set(&bound_program, &texture_unit);
-
   const TEXTURE_DATA: &[u8] = include_bytes!("./assets/LearnOpenGL/container.jpeg");
-  let mut texture = common::load_jpeg_texture_2d(gl.share(), TEXTURE_DATA);
+  let mut texture = common::load_jpeg_texture_2d(gl.share(), None, TEXTURE_DATA);
   {
-    let bound_texture = texture.bind(&texture_unit);
+    let bound_texture = texture.bind(None);
+    uni_texture.set(&bound_program, &bound_texture.unit());
     bound_texture.set_wrapping_modes(TextureWrappingMode::Repeat);
     bound_texture.set_filters(TextureFilter::Linear, Some(TextureFilter::Linear));
     bound_texture.generate_mipmap();

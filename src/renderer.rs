@@ -72,17 +72,11 @@ impl Renderer {
       bound_vbo.alloc_and_set(&[[-1, -1], [-1, 1], [1, 1], [1, -1]]);
     }
 
-    let texture_unit = oogl::TextureUnit::new(globals.gl.share());
-
-    let mut white_texture = oogl::Texture2D::new(
-      globals.gl.share(),
-      &texture_unit,
-      oogl::TextureInputFormat::RGBA,
-      None,
-    );
+    let mut white_texture =
+      oogl::Texture2D::new(globals.gl.share(), None, oogl::TextureInputFormat::RGBA, None);
     white_texture.set_debug_label(b"Renderer.white_texture");
     {
-      let bound_texture = white_texture.bind(&texture_unit);
+      let bound_texture = white_texture.bind(None);
       bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
       bound_texture.set_filters(oogl::TextureFilter::Linear, None);
       bound_texture.set_size(vec2n(1));
@@ -116,10 +110,9 @@ impl Renderer {
   }
 
   pub fn draw_shape(&mut self, shape: &mut Shape) {
-    let texture_unit = oogl::TextureUnit::new(self.globals.gl.share());
-    let (color, _bound_texture) = match &mut shape.fill {
-      ShapeFill::Color(color) => (*color, self.white_texture.bind(&texture_unit)),
-      ShapeFill::Texture(bound_texture) => (colorn(1.0, 1.0), bound_texture.bind(&texture_unit)),
+    let (color, bound_texture) = match &mut shape.fill {
+      ShapeFill::Color(color) => (*color, self.white_texture.bind(None)),
+      ShapeFill::Texture(bound_texture) => (colorn(1.0, 1.0), bound_texture.bind(None)),
     };
 
     let (program, reflection) = match shape.type_ {
@@ -137,7 +130,7 @@ impl Renderer {
     reflection.u_size.set(&program, &shape.size);
     reflection.u_rotation.set(&program, &shape.rotation);
     reflection.u_color.set(&program, &color);
-    reflection.u_tex.set(&program, &texture_unit);
+    reflection.u_tex.set(&program, &bound_texture.unit());
     if let Some(clipping) = &shape.fill_clipping {
       reflection.u_tex_clipping_offset.set(&program, &clipping.offset);
       reflection.u_tex_clipping_size.set(&program, &clipping.size);
@@ -349,8 +342,7 @@ pub fn load_texture_asset(
 
   let mut texture = load_texture_data_from_png(globals.gl.share(), path.as_bytes(), file)
     .with_context(|| format!("Failed to decode '{}'", path))?;
-  let texture_unit = oogl::TextureUnit::new(globals.gl.share());
-  let bound_texture = texture.bind(&texture_unit);
+  let bound_texture = texture.bind(None);
   bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
   bound_texture.set_filters(filter, None);
   drop(bound_texture);
@@ -384,11 +376,11 @@ pub fn load_texture_data_from_png<R: Read>(
     _ => unimplemented!("Unsupported texture color type: {:?}", info.color_type),
   };
 
-  let texture_unit = oogl::TextureUnit::new(gl.share());
-  let mut texture = oogl::Texture2D::new(gl, &texture_unit, gl_format, None);
+  let texture_unit = None;
+  let mut texture = oogl::Texture2D::new(gl, texture_unit, gl_format, None);
   texture.set_debug_label(debug_label);
   {
-    let bound_texture = texture.bind(&texture_unit);
+    let bound_texture = texture.bind(texture_unit);
     bound_texture.set_size(vec2(info.width, info.height));
     bound_texture.alloc_and_set(0, &buf);
   }

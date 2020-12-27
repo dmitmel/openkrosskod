@@ -1,4 +1,5 @@
 use crate::impl_prelude::*;
+use crate::TextureUnit;
 use cardboard_math::*;
 use prelude_plus::*;
 
@@ -18,8 +19,7 @@ pub struct Context {
   pub(crate) bound_texture_2d: BindingTarget<TextureBindingTarget>,
   pub(crate) bound_framebuffer: BindingTarget<FramebufferBindingTarget>,
 
-  active_texture_unit: Cell<u16>,
-  free_texture_units: UnsafeCell<Vec<u16>>,
+  active_texture_unit: Cell<TextureUnit>,
 }
 
 impl !Send for Context {}
@@ -40,12 +40,6 @@ impl Context {
     let capabilities = ContextCapabilities::load(&gl);
     assert!(capabilities.extensions.gl_oes_texture_npot);
 
-    // TODO: put this into some kind of GL configuration struct
-    const MAX_USABLE_TEXTURE_UNITS: u16 = 16;
-    let free_texture_units = UnsafeCell::new(
-      (0..capabilities.max_texture_units.min(MAX_USABLE_TEXTURE_UNITS)).rev().collect(),
-    );
-
     Self {
       raw_gl: gl,
       capabilities,
@@ -59,14 +53,13 @@ impl Context {
       bound_framebuffer: BindingTarget::new(crate::BindFramebufferTarget::Default.as_raw()),
 
       active_texture_unit: Cell::new(0),
-      free_texture_units,
     }
   }
 
   #[inline(always)]
-  pub fn active_texture_unit(&self) -> u16 { self.active_texture_unit.get() }
+  pub fn active_texture_unit(&self) -> TextureUnit { self.active_texture_unit.get() }
 
-  pub(crate) unsafe fn set_active_texture_unit(&self, unit: u16) {
+  pub(crate) unsafe fn set_active_texture_unit(&self, unit: TextureUnit) {
     self.raw_gl.ActiveTexture(gl::TEXTURE0 + unit as u32);
     self.active_texture_unit.set(unit);
   }
@@ -262,7 +255,7 @@ pub struct ContextCapabilities {
   pub glsl_version: String,
   pub extensions: ContextExtensions,
 
-  pub max_texture_units: u16,
+  pub max_texture_units: TextureUnit,
   pub max_texture_size: u32,
   pub max_vertex_attribs: u32,
 
@@ -342,8 +335,8 @@ impl ContextCapabilities {
       glsl_version,
       extensions,
 
-      max_texture_units: get_u32_1(gl, gl::MAX_COMBINED_TEXTURE_IMAGE_UNITS).min(u16::MAX as u32)
-        as u16,
+      max_texture_units: get_u32_1(gl, gl::MAX_COMBINED_TEXTURE_IMAGE_UNITS)
+        .min(TextureUnit::MAX as u32) as TextureUnit,
       max_texture_size: get_u32_1(gl, gl::MAX_TEXTURE_SIZE),
       max_vertex_attribs: get_u32_1(gl, gl::MAX_VERTEX_ATTRIBS),
 
@@ -435,40 +428,6 @@ bitflags! {
     const DEPTH = gl::DEPTH_BUFFER_BIT;
     const STENCIL = gl::STENCIL_BUFFER_BIT;
   }
-}
-
-#[derive(Debug)]
-pub struct TextureUnit {
-  id: u16,
-  ctx: SharedContext,
-}
-
-impl PartialEq for TextureUnit {
-  #[inline]
-  fn eq(&self, other: &Self) -> bool { self.id == other.id }
-}
-
-impl Hash for TextureUnit {
-  fn hash<H: Hasher>(&self, state: &mut H) { self.id.hash(state); }
-}
-
-impl Eq for TextureUnit {}
-
-impl TextureUnit {
-  #[inline(always)]
-  pub fn id(&self) -> u16 { self.id }
-  #[inline(always)]
-  pub fn ctx(&self) -> &SharedContext { &self.ctx }
-
-  pub fn new(ctx: SharedContext) -> Self {
-    let id =
-      unsafe { &mut *ctx.free_texture_units.get() }.pop().expect("no free texture units left");
-    Self { id, ctx }
-  }
-}
-
-impl Drop for TextureUnit {
-  fn drop(&mut self) { unsafe { &mut *self.ctx.free_texture_units.get() }.push(self.id); }
 }
 
 gl_enum!({

@@ -68,13 +68,13 @@ fn main() {
   bound_vbo.configure_attribs();
   bound_vbo.alloc_and_set(VERTEX_DATA);
 
-  let texture_unit = TextureUnit::new(gl.share());
-  uni_tex.set(&bound_program, &texture_unit);
-
-  let mut texture = Texture2D::new(gl.share(), &texture_unit, TextureInputFormat::RGBA, None);
-  let bound_texture = texture.bind(&texture_unit);
+  let texture_unit = None;
+  let mut texture = Texture2D::new(gl.share(), texture_unit, TextureInputFormat::RGBA, None);
+  let bound_texture = texture.bind(texture_unit);
   bound_texture.set_wrapping_modes(TextureWrappingMode::Repeat);
   bound_texture.set_filters(TextureFilter::Linear, Some(TextureFilter::Linear));
+
+  uni_tex.set(&bound_program, &bound_texture.unit());
 
   let texture_size = vec2(1920, 1080);
   bound_texture.set_size(texture_size);

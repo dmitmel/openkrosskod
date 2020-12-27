@@ -86,23 +86,21 @@ fn main() {
   bound_vbo.configure_attribs();
   bound_vbo.alloc_and_set(VERTEX_DATA);
 
-  let texture_unit1 = TextureUnit::new(gl.share());
-  let texture_unit2 = TextureUnit::new(gl.share());
-  uni_tex1.set(&bound_program, &texture_unit1);
-  uni_tex2.set(&bound_program, &texture_unit2);
   uni_blending_factor.set(&bound_program, &0.2);
 
-  let mut texture1 = load_jpeg_texture_2d(gl.share(), IMAGE_DATA_1);
+  let mut texture1 = load_jpeg_texture_2d(gl.share(), Some(1), IMAGE_DATA_1);
   {
-    let bound_texture1 = texture1.bind(&texture_unit1);
+    let bound_texture1 = texture1.bind(None);
+    uni_tex1.set(&bound_program, &bound_texture1.unit());
     bound_texture1.set_wrapping_modes(TextureWrappingMode::Repeat);
     bound_texture1.set_filters(TextureFilter::Linear, Some(TextureFilter::Linear));
     bound_texture1.generate_mipmap();
   }
 
-  let mut texture2 = load_png_texture_2d(gl.share(), IMAGE_DATA_2);
+  let mut texture2 = load_png_texture_2d(gl.share(), Some(2), IMAGE_DATA_2);
   {
-    let bound_texture2 = texture2.bind(&texture_unit2);
+    let bound_texture2 = texture2.bind(None);
+    uni_tex2.set(&bound_program, &bound_texture2.unit());
     bound_texture2.set_wrapping_modes(TextureWrappingMode::Repeat);
     bound_texture2.set_filters(TextureFilter::Linear, Some(TextureFilter::Linear));
     bound_texture2.generate_mipmap();
@@ -134,7 +132,11 @@ fn main() {
   }
 }
 
-fn load_png_texture_2d(gl: SharedContext, encoded_data: &[u8]) -> Texture2D {
+fn load_png_texture_2d(
+  gl: SharedContext,
+  texture_unit_preference: Option<TextureUnit>,
+  encoded_data: &[u8],
+) -> Texture2D {
   let decoder = png::Decoder::new(encoded_data);
   let (info, mut reader) = decoder.read_info().unwrap();
   let mut buf = vec![0; info.buffer_size()];
@@ -143,10 +145,9 @@ fn load_png_texture_2d(gl: SharedContext, encoded_data: &[u8]) -> Texture2D {
   assert!(info.bit_depth == png::BitDepth::Eight);
   assert!(info.color_type == png::ColorType::RGBA);
 
-  let texture_unit = TextureUnit::new(gl.share());
-  let mut texture = Texture2D::new(gl, &texture_unit, TextureInputFormat::RGBA, None);
+  let mut texture = Texture2D::new(gl, texture_unit_preference, TextureInputFormat::RGBA, None);
   {
-    let bound_texture = texture.bind(&texture_unit);
+    let bound_texture = texture.bind(None);
     bound_texture.set_size(vec2(info.width, info.height));
     bound_texture.alloc_and_set(0, &buf);
   }
@@ -154,17 +155,20 @@ fn load_png_texture_2d(gl: SharedContext, encoded_data: &[u8]) -> Texture2D {
   texture
 }
 
-fn load_jpeg_texture_2d(gl: SharedContext, encoded_data: &[u8]) -> Texture2D {
+fn load_jpeg_texture_2d(
+  gl: SharedContext,
+  texture_unit_preference: Option<TextureUnit>,
+  encoded_data: &[u8],
+) -> Texture2D {
   let mut decoder = jpeg_decoder::Decoder::new(encoded_data);
   let buf = decoder.decode().unwrap();
   let info = decoder.info().unwrap();
 
   assert!(info.pixel_format == jpeg_decoder::PixelFormat::RGB24);
 
-  let texture_unit = TextureUnit::new(gl.share());
-  let mut texture = Texture2D::new(gl, &texture_unit, TextureInputFormat::RGB, None);
+  let mut texture = Texture2D::new(gl, texture_unit_preference, TextureInputFormat::RGB, None);
   {
-    let bound_texture = texture.bind(&texture_unit);
+    let bound_texture = texture.bind(None);
     bound_texture.set_size(vec2(info.width as u32, info.height as u32));
     bound_texture.alloc_and_set(0, &buf);
   }

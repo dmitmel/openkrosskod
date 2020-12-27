@@ -36,7 +36,7 @@ impl Framebuffer {
     this
   }
 
-  pub fn bind(&'_ mut self) -> FramebufferBinding<'_> {
+  pub fn bind(&mut self) -> FramebufferBinding<'_> {
     let binding_target = &self.ctx.bound_framebuffer;
     binding_target.on_binding_created(self.addr);
     binding_target.bind_if_needed(self.raw_gl(), self.addr);
