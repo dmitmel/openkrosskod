@@ -35,4 +35,7 @@ num_cpus = "1.13.0"
 env_logger = { version = "0.8.1", default-features = false, features = ["termcolor", "atty", "humantime"] }
 
 [features]
+default = ["screenshot"]
+
 gl_debug_all_commands = ["cardboard_oogl/debug_all_commands"]
+screenshot = ["png/png-encoding"]

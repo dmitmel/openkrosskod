@@ -67,8 +67,6 @@ impl Renderer {
     vbo.set_debug_label(b"Renderer.vbo");
     {
       let bound_vbo = vbo.bind();
-      bound_vbo.enable_attribs();
-      bound_vbo.configure_attribs();
       bound_vbo.alloc_and_set(&[[-1, -1], [-1, 1], [1, 1], [1, -1]]);
     }
 
@@ -107,6 +105,15 @@ impl Renderer {
         reflection.u_window_size.set(&bound_program, &window_size);
       }
     }
+
+    let bound_vbo = self.vbo.bind();
+    bound_vbo.enable_attribs();
+    bound_vbo.configure_attribs();
+  }
+
+  pub fn finish(&mut self) {
+    let bound_vbo = self.vbo.bind();
+    bound_vbo.disable_attribs();
   }
 
   pub fn draw_shape(&mut self, shape: &mut Shape) {

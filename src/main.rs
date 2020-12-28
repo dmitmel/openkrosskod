@@ -694,5 +694,65 @@ impl Game {
         fill_clipping: None,
       });
     }
+
+    self.renderer.finish();
+
+    #[cfg(feature = "screenshot")]
+    if self.globals.input_state.is_key_down(Scancode::F8) {
+      self.screenshot();
+    }
+  }
+
+  #[cfg(feature = "screenshot")]
+  fn screenshot(&mut self) {
+    let path = Path::new("screenshot.png");
+    let size = self.globals.window_size_i;
+    let mut pixels = vec![0; size.x as usize * size.y as usize * 4];
+
+    info!("'{}', {}x{} RGBA, {} bytes for pixels", path.display(), size.x, size.y, pixels.len());
+
+    unsafe {
+      use cardboard_oogl::raw_gl as gl;
+      let gl = self.globals.gl.raw_gl();
+      gl.ReadPixels(
+        0,
+        0,
+        i32::try_from(size.x).unwrap(),
+        i32::try_from(size.y).unwrap(),
+        gl::RGBA,
+        gl::UNSIGNED_BYTE,
+        pixels.as_mut_ptr() as *mut c_void,
+      );
+    }
+
+    flip_rgba_image_data_vertically(size, &mut pixels);
+
+    let file = File::create(path).unwrap();
+    let writer = BufWriter::new(file);
+
+    let mut encoder = png::Encoder::new(writer, size.x, size.y);
+    encoder.set_color(png::ColorType::RGBA);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().unwrap();
+
+    writer.write_image_data(&pixels).unwrap();
+  }
+}
+
+#[cfg(feature = "screenshot")]
+fn flip_rgba_image_data_vertically(size: Vec2u32, pixels: &mut [u8]) {
+  assert!(pixels.len() == size.x as usize * size.y as usize * 4);
+
+  let row_len = size.x as usize * 4;
+  let (mut half1, mut half2) = pixels.split_at_mut(row_len * (size.y / 2) as usize);
+  for _ in 0..size.y / 2 {
+    // len needs to be saved because using the length in slicing expressions
+    // makes the borrow checker unhappy
+    let half2_len = half2.len();
+    let row1 = &mut half1[..row_len];
+    let row2 = &mut half2[half2_len - row_len..];
+    row1.swap_with_slice(row2);
+    half1 = &mut half1[row_len..];
+    half2 = &mut half2[..half2_len - row_len];
   }
 }
