@@ -339,8 +339,9 @@ pub fn load_texture_asset(
   filter: oogl::TextureFilter,
 ) -> AnyResult<oogl::Texture2D> {
   let file = globals.game_fs.open_file(&path)?;
+  let reader = BufReader::new(file);
 
-  let mut texture = load_texture_data_from_png(globals.gl.share(), path.as_bytes(), file)
+  let mut texture = load_texture_data_from_png(globals.gl.share(), path.as_bytes(), reader)
     .with_context(|| format!("Failed to decode '{}'", path))?;
   let bound_texture = texture.bind(None);
   bound_texture.set_wrapping_modes(oogl::TextureWrappingMode::Repeat);
@@ -350,10 +351,10 @@ pub fn load_texture_asset(
   Ok(texture)
 }
 
-pub fn load_texture_data_from_png<R: Read>(
+pub fn load_texture_data_from_png(
   gl: oogl::SharedContext,
   debug_label: &[u8],
-  reader: R,
+  reader: impl Read,
 ) -> Result<oogl::Texture2D, png::DecodingError> {
   let decoder = png::Decoder::new(reader);
   let (info, mut reader) = decoder.read_info()?;

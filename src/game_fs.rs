@@ -46,12 +46,13 @@ impl GameFs {
   }
 
   fn _read_binary_file(&self, relative_path: &Path) -> AnyResult<Vec<u8>> {
-    let mut file = self._open_file(relative_path)?;
+    let file = self._open_file(relative_path)?;
     let mut bytes = Vec::with_capacity(
       // see the private function initial_buffer_size in std::fs
       file.metadata().map_or(0, |m| m.len() as usize + 1),
     );
-    file
+    let mut reader = BufReader::new(file);
+    reader
       .read_to_end(&mut bytes)
       .with_context(|| format!("Failed to read file '{}'", relative_path.display()))?;
     Ok(bytes)
