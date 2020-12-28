@@ -207,7 +207,7 @@ fn try_main() -> AnyResult<()> {
 
   info!("Core subsystems have been initialized, starting the game loop...");
   info!("Hi!");
-  let result = game.start_loop();
+  let result = game.start_loop().context("Critical error in the game loop!");
   info!("Bye!");
   result
 }
@@ -377,7 +377,7 @@ impl Game {
       }
 
       if !idling {
-        self.early_update();
+        self.early_update().context("Error in early_update")?;
 
         fixed_update_time_accumulator += delta_time;
         let fixed_delta_time = self.globals.fixed_delta_time;
@@ -385,16 +385,16 @@ impl Game {
         // game being suspended or paused with SIGSTOP (and resumed with SIGCONT)?
         while fixed_update_time_accumulator >= fixed_delta_time {
           mut_globals(self).fixed_time += fixed_delta_time;
-          self.fixed_update();
+          self.fixed_update().context("Error in fixed_update")?;
           fixed_update_time_accumulator -= fixed_delta_time;
         }
 
-        self.update();
+        self.update().context("Error in update")?;
 
         #[cfg(feature = "gl_debug_all_commands")]
         println!("================ [OpenGL] ================");
 
-        self.render();
+        self.render().context("Error in render")?;
         self.window.gl_swap_window();
       } else {
         thread::sleep(Duration::from_secs_f64(GAME_LOOP_IDLING_WAIT_INTERVAL));
@@ -482,7 +482,7 @@ impl Game {
     }
   }
 
-  pub fn early_update(&mut self) {
+  pub fn early_update(&mut self) -> AnyResult<()> {
     if self.globals.input_state.is_key_down(Scancode::B) {
       breakpoint();
     }
@@ -496,11 +496,13 @@ impl Game {
         racket.update_pos(&self.globals);
       }
     }
+
+    Ok(())
   }
 
-  pub fn update(&mut self) {}
+  pub fn update(&mut self) -> AnyResult<()> { Ok(()) }
 
-  pub fn fixed_update(&mut self) {
+  pub fn fixed_update(&mut self) -> AnyResult<()> {
     self.debug_vectors.clear();
 
     let fixed_delta_time = self.globals.fixed_delta_time as f32;
@@ -610,9 +612,11 @@ impl Game {
         }
       }
     }
+
+    Ok(())
   }
 
-  pub fn render(&mut self) {
+  pub fn render(&mut self) -> AnyResult<()> {
     let gl = &self.globals.gl;
     if self.globals.window_was_resized {
       gl.set_viewport(vec2n(0), self.globals.window_size_i.cast_into());
@@ -699,17 +703,25 @@ impl Game {
 
     #[cfg(feature = "screenshot")]
     if self.globals.input_state.is_key_down(Scancode::F8) {
-      self.screenshot();
+      self.screenshot().context("Failed to take a screenshot")?;
     }
+
+    Ok(())
   }
 
   #[cfg(feature = "screenshot")]
-  fn screenshot(&mut self) {
+  fn screenshot(&mut self) -> AnyResult<()> {
     let path = Path::new("screenshot.png");
     let size = self.globals.window_size_i;
     let mut pixels = vec![0; size.x as usize * size.y as usize * 4];
 
-    info!("'{}', {}x{} RGBA, {} bytes for pixels", path.display(), size.x, size.y, pixels.len());
+    info!(
+      "Saving a screenshot to '{}', {}x{} RGBA, {} bytes for pixels",
+      path.display(),
+      size.x,
+      size.y,
+      pixels.len()
+    );
 
     unsafe {
       use cardboard_oogl::raw_gl as gl;
@@ -727,15 +739,18 @@ impl Game {
 
     flip_rgba_image_data_vertically(size, &mut pixels);
 
-    let file = File::create(path).unwrap();
+    let file =
+      File::create(path).with_context(|| format!("Failed to create file '{}'", path.display()))?;
     let writer = BufWriter::new(file);
 
     let mut encoder = png::Encoder::new(writer, size.x, size.y);
     encoder.set_color(png::ColorType::RGBA);
     encoder.set_depth(png::BitDepth::Eight);
-    let mut writer = encoder.write_header().unwrap();
+    let mut writer = encoder.write_header().context("Failed to write the PNG header")?;
 
-    writer.write_image_data(&pixels).unwrap();
+    writer.write_image_data(&pixels).context("Failed to write the encoded PNG data")?;
+
+    Ok(())
   }
 }
 
