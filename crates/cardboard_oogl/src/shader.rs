@@ -174,6 +174,8 @@ impl Program {
     unsafe { gl.LinkProgram(self.addr) };
     let mut status = gl::FALSE as i32;
     unsafe { gl.GetProgramiv(self.addr, gl::LINK_STATUS, &mut status) };
+    self.load_uniform_descriptors();
+    self.load_attrib_descriptors();
     status == gl::TRUE as i32
   }
 
@@ -197,12 +199,7 @@ impl Program {
     buf
   }
 
-  pub fn load_descriptors(&self) {
-    self.load_uniform_descriptors();
-    self.load_attrib_descriptors();
-  }
-
-  pub fn load_uniform_descriptors(&self) {
+  fn load_uniform_descriptors(&self) {
     let gl = self.raw_gl();
     let mut uniform_descriptors = self.uniform_descriptors.borrow_mut();
     uniform_descriptors.clear();
@@ -263,7 +260,7 @@ impl Program {
     }
   }
 
-  pub fn load_attrib_descriptors(&self) {
+  fn load_attrib_descriptors(&self) {
     let gl = self.raw_gl();
     let mut attrib_descriptors = self.attrib_descriptors.borrow_mut();
     attrib_descriptors.clear();

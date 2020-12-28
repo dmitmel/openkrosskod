@@ -83,7 +83,6 @@ pub fn link_program(gl: SharedContext, vertex: &Shader, fragment: &Shader) -> Pr
 
   program.detach_shader(vertex);
   program.detach_shader(fragment);
-  program.load_descriptors();
   program
 }
 

@@ -57,11 +57,12 @@ impl Renderer {
       oogl::BufferUsageHint::StaticDraw,
       // this attribute pointer will be the same for both programs because both
       // use the same vertex shader, as such the VBO can be shared
-      vec![rectangle_program_reflection.a_pos.to_pointer(oogl::AttribPtrType {
-        name: oogl::AttribPtrTypeName::I8,
-        len: 2,
-        normalize: false,
-      })],
+      vec![
+        //
+        rectangle_program_reflection
+          .a_pos
+          .to_pointer_simple_with_cast(oogl::AttribPtrTypeName::I8),
+      ],
     );
 
     vbo.set_debug_label(b"Renderer.vbo");
@@ -292,7 +293,6 @@ pub fn load_program_asset(
   let program = link_program(globals.gl.share(), shaders)
     .with_context(|| format!("Failed to link program '{}'", name))?;
   program.set_debug_label(name.as_bytes());
-  program.load_descriptors();
   Ok(program)
 }
 

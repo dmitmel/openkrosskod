@@ -444,6 +444,10 @@ impl<T: CorrespondingAttribPtrType> crate::Attrib<T> {
   pub fn to_pointer_simple(&self) -> AttribPtr {
     self.to_pointer(T::CORRESPONDING_ATTRIB_PTR_TYPE)
   }
+
+  pub fn to_pointer_simple_with_cast(&self, name: AttribPtrTypeName) -> AttribPtr {
+    self.to_pointer(AttribPtrType { name, ..T::CORRESPONDING_ATTRIB_PTR_TYPE })
+  }
 }
 
 gl_enum!({
