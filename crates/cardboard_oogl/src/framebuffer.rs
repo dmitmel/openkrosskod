@@ -31,9 +31,9 @@ impl Framebuffer {
   pub fn new(ctx: SharedContext) -> Self {
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenFramebuffers(1, &mut addr) };
-    let mut this = Self { ctx, addr };
-    drop(this.bind());
-    this
+    let mut myself = Self { ctx, addr };
+    drop(myself.bind());
+    myself
   }
 
   pub fn bind(&mut self) -> FramebufferBinding<'_> {

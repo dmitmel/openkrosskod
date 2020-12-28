@@ -336,12 +336,12 @@ macro_rules! impl_vec_n_for_t {
 }
 
 macro_rules! impl_vec_n_operator {
-  (unary, $VecTy:ident<$NumTy:ident>, $op:ident, fn $op_fn:ident($this:ident) $op_fn_body:block) => {
+  (unary, $VecTy:ident<$NumTy:ident>, $op:ident, fn $op_fn:ident($myself:ident) $op_fn_body:block) => {
     impl $op for $VecTy<$NumTy> {
       type Output = Self;
       #[inline]
       fn $op_fn(self) -> Self::Output {
-        let $this = self;
+        let $myself = self;
         $op_fn_body
       }
     }

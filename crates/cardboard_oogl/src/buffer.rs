@@ -54,10 +54,10 @@ impl<T: Copy> VertexBuffer<T> {
 
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenBuffers(1, &mut addr) };
-    let mut this =
+    let mut myself =
       Self { ctx, addr, usage_hint, attribs, stride, len: Cell::new(0), phantom: PhantomData };
-    drop(this.bind());
-    this
+    drop(myself.bind());
+    myself
   }
 
   pub fn bind(&mut self) -> VertexBufferBinding<'_, T> {
@@ -166,9 +166,9 @@ impl<T: BufferIndex> ElementBuffer<T> {
   pub fn new(ctx: SharedContext, usage_hint: BufferUsageHint) -> Self {
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenBuffers(1, &mut addr) };
-    let mut this = Self { ctx, addr, usage_hint, len: Cell::new(0), phantom: PhantomData };
-    drop(this.bind());
-    this
+    let mut myself = Self { ctx, addr, usage_hint, len: Cell::new(0), phantom: PhantomData };
+    drop(myself.bind());
+    myself
   }
 
   pub fn bind(&mut self) -> ElementBufferBinding<'_, T> {

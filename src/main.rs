@@ -357,8 +357,8 @@ impl Game {
     let mut fixed_update_time_accumulator = 0.0;
     let mut idling = false;
 
-    fn mut_globals(this: &mut Game) -> &mut Globals {
-      unsafe { Rc::get_mut_unchecked(&mut this.globals) }
+    fn mut_globals(myself: &mut Game) -> &mut Globals {
+      unsafe { Rc::get_mut_unchecked(&mut myself.globals) }
     }
 
     while !self.globals.should_stop_game_loop.get() {

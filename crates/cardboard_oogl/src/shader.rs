@@ -319,12 +319,12 @@ impl Program {
   pub fn get_uniform<T: CorrespondingUniformType>(&self, name: &str) -> Uniform<T> {
     #[inline(never)]
     fn check_uniform_type(
-      this: &Program,
+      myself: &Program,
       name: &str,
       corresponding_types: &'static [GlslTypeName],
       rust_type_name: &'static str,
     ) -> (i32, Option<GlslType>) {
-      if let Some(descriptor) = this.uniform_descriptors.borrow().get(name) {
+      if let Some(descriptor) = myself.uniform_descriptors.borrow().get(name) {
         let data_type = &descriptor.data_type;
         assert!(
           corresponding_types.contains(&data_type.name),
@@ -352,12 +352,12 @@ impl Program {
   pub fn get_attrib<T: CorrespondingAttribType>(&self, name: &str) -> Attrib<T> {
     #[inline(never)]
     fn check_attrib_type(
-      this: &Program,
+      myself: &Program,
       name: &str,
       corresponding_types: &'static [GlslTypeName],
       rust_type_name: &'static str,
     ) -> (u32, Option<GlslType>) {
-      if let Some(descriptor) = this.attrib_descriptors.borrow().get(name) {
+      if let Some(descriptor) = myself.attrib_descriptors.borrow().get(name) {
         let data_type = &descriptor.data_type;
         assert!(
           corresponding_types.contains(&data_type.name),

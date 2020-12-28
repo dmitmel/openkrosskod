@@ -53,7 +53,7 @@ impl<T: TextureDataType> Texture2D<T> {
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenTextures(1, &mut addr) };
 
-    let mut this = Self {
+    let mut myself = Self {
       ctx,
       addr,
 
@@ -65,8 +65,8 @@ impl<T: TextureDataType> Texture2D<T> {
 
       phantom: PhantomData,
     };
-    drop(this.bind(unit_preference));
-    this
+    drop(myself.bind(unit_preference));
+    myself
   }
 
   pub fn size_at_level_of_detail(&self, level_of_detail: u32) -> Vec2u32 {
