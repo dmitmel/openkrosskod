@@ -12,7 +12,6 @@ pub mod renderer;
 
 use prelude_plus::*;
 use sdl2::event::{Event, WindowEvent};
-use sdl2::keyboard::Scancode;
 use sdl2::video::{GLProfile, Window};
 use sdl2::EventPump;
 
@@ -21,6 +20,7 @@ use cardboard_oogl as oogl;
 
 use crate::game_fs::*;
 use crate::globals::*;
+use crate::input::Key;
 use crate::renderer::*;
 
 const GAME_NAME: &str = "openKrossKod";
@@ -172,9 +172,9 @@ fn try_main() -> AnyResult<()> {
     right_racket.update_pos(&globals);
 
     let (left_racket_controller, right_racket_controller) = (
-      // RacketController::Player { key_up: Scancode::W, key_down: Scancode::S },
+      // RacketController::Player { key_up: Key::W, key_down: Key::S },
       RacketController::Bot,
-      RacketController::Player { key_up: Scancode::Up, key_down: Scancode::Down },
+      RacketController::Player { key_up: Key::Up, key_down: Key::Down },
     );
 
     let mut ball = Ball::new(3);
@@ -302,7 +302,7 @@ impl Ball {
 
 #[derive(Debug)]
 enum RacketController {
-  Player { key_up: Scancode, key_down: Scancode },
+  Player { key_up: Key, key_down: Key },
   Bot,
 }
 
@@ -427,6 +427,9 @@ impl Game {
     //   hold "false" is used to avoid branching.
     globals.window_was_resized = globals.first_game_loop_tick;
 
+    globals.input_state.prev_mouse_pos = globals.input_state.mouse_pos;
+    globals.input_state.prev_keyboard_state_table = globals.input_state.keyboard_state_table;
+
     for event in self.event_pump.poll_iter() {
       match event {
         Event::Quit { .. } | Event::AppTerminating { .. } | Event::AppLowMemory { .. } => {
@@ -465,29 +468,48 @@ impl Game {
             vec2(x as f32 - globals.window_size.x * 0.5, globals.window_size.y * 0.5 - y as f32);
         }
 
+        Event::MouseButtonDown { window_id, mouse_btn, .. } if window_id == main_window_id => {
+          if let Some(key) = Key::from_sdl2_mouse_button(mouse_btn) {
+            globals.input_state.set_key_down(key, true);
+          }
+        }
+
+        Event::MouseButtonUp { window_id, mouse_btn, .. } if window_id == main_window_id => {
+          if let Some(key) = Key::from_sdl2_mouse_button(mouse_btn) {
+            globals.input_state.set_key_down(key, false);
+          }
+        }
+
         Event::KeyDown { window_id, scancode: Some(scancode), .. }
           if window_id == main_window_id =>
         {
-          globals.input_state.keyboard.set(scancode, true);
+          if let Some(key) = Key::from_sdl2_scancode(scancode) {
+            globals.input_state.set_key_down(key, true);
+          }
         }
 
         Event::KeyUp { window_id, scancode: Some(scancode), .. }
           if window_id == main_window_id =>
         {
-          globals.input_state.keyboard.set(scancode, false);
+          if let Some(key) = Key::from_sdl2_scancode(scancode) {
+            globals.input_state.set_key_down(key, false);
+          }
         }
 
         _ => {}
       }
     }
+
+    globals.input_state.delta_mouse_pos =
+      globals.input_state.mouse_pos - globals.input_state.prev_mouse_pos;
   }
 
   pub fn early_update(&mut self) -> AnyResult<()> {
-    if self.globals.input_state.is_key_down(Scancode::B) {
+    if self.globals.input_state.is_key_pressed(Key::B) {
       breakpoint();
     }
 
-    if self.globals.input_state.is_key_down(Scancode::Q) {
+    if self.globals.input_state.is_key_pressed(Key::Q) {
       self.globals.should_stop_game_loop.set(true);
     }
 
@@ -702,7 +724,7 @@ impl Game {
     self.renderer.finish();
 
     #[cfg(feature = "screenshot")]
-    if self.globals.input_state.is_key_down(Scancode::F8) {
+    if self.globals.input_state.is_key_pressed(Key::F8) {
       self.screenshot().context("Failed to take a screenshot")?;
     }
 
