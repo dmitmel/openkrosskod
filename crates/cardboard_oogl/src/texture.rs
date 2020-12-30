@@ -141,7 +141,6 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
 
   pub fn set_size(&self, size: Vec2u32) {
     let max_size = self.ctx().capabilities().max_texture_size;
-    // index out of bounds: the len is 3 but the index is 4
     assert!(size.x > 0);
     assert!(size.y > 0);
     assert!(size.x <= max_size);
@@ -219,11 +218,7 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
 
   pub fn alloc_and_set(&self, level_of_detail: u32, data: &[T]) {
     let size = self.texture.size_at_level_of_detail(level_of_detail);
-    assert_eq!(
-      data.len(),
-      size.x as usize * size.y as usize * self.texture.input_format.color_components() as usize
-    );
-
+    assert_texture_data_len(data.len(), size, self.texture.input_format);
     self.alloc_and_set_internal(level_of_detail, data.as_ptr());
   }
 
@@ -253,14 +248,9 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
   }
 
   pub fn set_slice(&self, level_of_detail: u32, offset: Vec2u32, size: Vec2u32, data: &[T]) {
-    assert_eq!(
-      data.len(),
-      size.x as usize * size.y as usize * self.texture.input_format.color_components() as usize
-    );
-
-    // TODO: Add check of the rectangle fromed by the offset and the size being
+    assert_texture_data_len(data.len(), size, self.texture.input_format);
+    // TODO: Add check of the rectangle formed by the offset and the size being
     // contained inside the texture size, somehow ignore it in `set`.
-
     unsafe {
       self.ctx().raw_gl().TexSubImage2D(
         Self::BIND_TARGET.as_raw(),
@@ -274,6 +264,35 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
         data.as_ptr() as *const _,
       );
     }
+  }
+}
+
+#[track_caller]
+fn assert_texture_data_len(data_len: usize, size: Vec2u32, format: TextureInputFormat) {
+  let expected_data_len = size.x as usize * size.y as usize * format.color_components() as usize;
+  if data_len != expected_data_len {
+    #[inline(never)]
+    #[cold]
+    #[track_caller]
+    fn texture_data_len_mismatch_fail(
+      expected_data_len: usize,
+      data_len: usize,
+      size: Vec2u32,
+      format: TextureInputFormat,
+    ) -> ! {
+      panic!(
+        "texture data length mismatch: the length of the provided data slice is {}, but the \
+        required length for an image of size {}x{} and with input format `{:?}` ({} color \
+        components) is {}",
+        data_len,
+        size.x,
+        size.y,
+        format,
+        format.color_components(),
+        expected_data_len,
+      );
+    }
+    texture_data_len_mismatch_fail(expected_data_len, data_len, size, format);
   }
 }
 
