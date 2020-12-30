@@ -13,6 +13,10 @@ pub unsafe trait Object {
   #[inline(always)]
   fn raw_gl(&self) -> &RawGL { self.ctx().raw_gl() }
 
+  fn unset_debug_label(&self) {
+    unsafe { debug::unset_object_debug_label(self.ctx(), Self::DEBUG_TYPE_ID, self.addr()) };
+  }
+
   fn set_debug_label(&self, label: &[u8]) {
     unsafe { debug::set_object_debug_label(self.ctx(), Self::DEBUG_TYPE_ID, self.addr(), label) };
   }

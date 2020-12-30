@@ -72,13 +72,31 @@ extern "system" fn internal_debug_message_callback(
   );
 }
 
+pub(crate) unsafe fn unset_object_debug_label(ctx: &Context, type_id: u32, addr: u32) {
+  let gl = ctx.raw_gl();
+  if gl.ObjectLabel.is_loaded() {
+    gl.ObjectLabel(type_id, addr, 0, ptr::null());
+  }
+}
+
 pub(crate) unsafe fn set_object_debug_label(ctx: &Context, type_id: u32, addr: u32, label: &[u8]) {
   let gl = ctx.raw_gl();
   if gl.ObjectLabel.is_loaded() {
     let label_len = i32::try_from(label.len()).unwrap();
     assert!(label_len <= ctx.capabilities().max_debug_object_label_len);
 
-    // TODO: Check that the label doesn't contain any NUL characters
+    // `<[u8]>::contains` internally uses `memchr` which is faster than a
+    // simple loop. Unfortunately the `memchr` implementation is not exported
+    // from the std, so I can't really get an index of the offending NUL byte
+    // without using less efficient methods (using just std). If the need
+    // arises - either use the crate `memchr` or the unstable feature
+    // `slice_internals`.
+    // By the way, the behavior of ignoring characters past the NUL byte in the
+    // debug label is undocumented as far as I know.
+    if label.contains(&0) {
+      // error message was copied from `Error` impl of `FromBytesWithNulError`
+      panic!("data provided contains an interior nul byte");
+    }
 
     gl.ObjectLabel(type_id, addr, label_len, label.as_ptr() as *const c_char);
   }
