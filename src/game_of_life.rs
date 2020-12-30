@@ -321,7 +321,7 @@ impl GameOfLife {
           bound_vbo.enable_attribs();
         }
         bound_vbo.configure_attribs();
-        bound_ebo.draw_slice(&bound_program, oogl::DrawPrimitive::Triangles, 0, indices_count);
+        bound_ebo.draw_slice(&bound_program, oogl::DrawPrimitive::Triangles, ..indices_count);
         if is_last {
           bound_vbo.disable_attribs();
         }

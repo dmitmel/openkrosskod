@@ -1,8 +1,8 @@
 use crate::impl_prelude::*;
 use cardboard_math::*;
 use prelude_plus::*;
-
-// TODO: implement size handling system similar to that of Texture2D
+use std::any::type_name;
+use std::ops::RangeBounds;
 
 gl_enum!({
   pub enum BindBufferTarget {
@@ -43,14 +43,30 @@ impl<T: Copy> VertexBuffer<T> {
   pub fn stride(&self) -> u32 { self.stride }
 
   pub fn new(ctx: SharedContext, usage_hint: BufferUsageHint, attribs: Vec<AttribPtr>) -> Self {
-    let mut stride = 0;
+    let mut stride: u32 = 0;
     for attrib in &attribs {
-      assert!(1 <= attrib.type_.len && attrib.type_.len <= 4);
-      stride += attrib.size as u32;
+      stride = stride.checked_add(attrib.size).unwrap();
     }
-    assert!(stride <= i32::MAX as u32); // for quick conversion to GLsizei
+    assert!(stride <= i32::MAX as u32); // for quick conversion to GLsizei/i32
 
-    assert_eq!(mem::size_of::<T>(), stride as usize);
+    let size_of_type = mem::size_of::<T>();
+    if stride as usize != size_of_type {
+      #[inline(never)]
+      #[cold]
+      #[track_caller]
+      fn buffer_stride_mismatch_fail(
+        type_name: &'static str,
+        size_of_type: usize,
+        stride: u32,
+      ) -> ! {
+        panic!(
+          "stride calculated from the vertex attribute pointers ({} bytes) doesn't match size of \
+          the vertex type `{}` ({} bytes)",
+          stride, type_name, size_of_type,
+        );
+      }
+      buffer_stride_mismatch_fail(type_name::<T>(), size_of_type, stride);
+    }
 
     let mut addr = 0;
     unsafe { ctx.raw_gl().GenBuffers(1, &mut addr) };
@@ -96,15 +112,14 @@ impl<'obj, T: Copy> Drop for VertexBufferBinding<'obj, T> {
 impl<'obj, T: Copy> VertexBufferBinding<'obj, T> {
   pub fn configure_attribs(&self) {
     let gl = self.raw_gl();
-    let attribs = &self.buffer.attribs;
     let stride = self.buffer.stride;
 
     let mut offset = 0;
-    for attrib in attribs {
+    for attrib in &self.buffer.attribs {
       if attrib.is_active() {
         unsafe {
           gl.VertexAttribPointer(
-            attrib.location as u32,
+            attrib.location,
             attrib.type_.len as i32,
             attrib.type_.name.as_raw(),
             attrib.type_.normalize as u8,
@@ -120,20 +135,18 @@ impl<'obj, T: Copy> VertexBufferBinding<'obj, T> {
   // https://stackoverflow.com/q/39264296/12005228
   pub fn enable_attribs(&self) {
     let gl = self.raw_gl();
-    let attribs = &self.buffer.attribs;
-    for attrib in attribs {
+    for attrib in &self.buffer.attribs {
       if attrib.is_active() {
-        unsafe { gl.EnableVertexAttribArray(attrib.location as u32) };
+        unsafe { gl.EnableVertexAttribArray(attrib.location) };
       }
     }
   }
 
   pub fn disable_attribs(&self) {
     let gl = self.raw_gl();
-    let attribs = &self.buffer.attribs;
-    for attrib in attribs {
+    for attrib in &self.buffer.attribs {
       if attrib.is_active() {
-        unsafe { gl.DisableVertexAttribArray(attrib.location as u32) };
+        unsafe { gl.DisableVertexAttribArray(attrib.location) };
       }
     }
   }
@@ -298,15 +311,20 @@ where
   fn set(&'obj self, data: &[T]) {
     let self_len = self.len();
     let slice_len = data.len();
-    assert_eq!(slice_len, self_len);
+    if slice_len != self_len {
+      buffer_sub_data_len_mismatch_fail(slice_len, self_len);
+    }
     unsafe { self.__impl_buffer_sub_data(0, slice_len, data.as_ptr()) };
   }
 
-  fn set_slice(&'obj self, offset: usize, data: &[T]) {
-    let self_len = self.len();
+  fn set_slice(&'obj self, range: impl RangeBounds<usize>, data: &[T]) {
     let slice_len = data.len();
-    assert!(offset <= self_len);
-    assert!(offset + slice_len <= self_len);
+    let normalized_range: Range<usize> = range.assert_len(self.len());
+    let offset = normalized_range.start;
+    let range_len = normalized_range.end - normalized_range.start;
+    if slice_len != range_len {
+      buffer_sub_data_len_mismatch_fail(slice_len, range_len);
+    }
     unsafe { self.__impl_buffer_sub_data(offset, slice_len, data.as_ptr()) };
   }
 
@@ -328,6 +346,16 @@ where
       data as *const c_void,
     );
   }
+}
+
+#[inline(never)]
+#[cold]
+#[track_caller]
+fn buffer_sub_data_len_mismatch_fail(slice_len: usize, buf_range_len: usize) -> ! {
+  panic!(
+    "data slice length ({}) doesn't match the specified buffer slice length ({})",
+    slice_len, buf_range_len,
+  );
 }
 
 unsafe impl<'obj, T> BufferBinding<'obj, VertexBuffer<T>, T> for VertexBufferBinding<'obj, T>
@@ -358,12 +386,11 @@ where
     &'obj self,
     _program_binding: &crate::ProgramBinding,
     mode: DrawPrimitive,
-    start: usize,
-    count: usize,
+    range: impl RangeBounds<usize>,
   ) {
-    let self_len = self.len();
-    assert!(start <= self_len);
-    assert!(start + count <= self_len);
+    let normalized_range: Range<usize> = range.assert_len(self.len());
+    let start = normalized_range.start;
+    let count = normalized_range.end - normalized_range.start;
     unsafe { self.__impl_draw(mode, start, count) }
   }
 
@@ -394,7 +421,7 @@ where
       mode.as_raw(),
       i32::try_from(count).unwrap(),
       T::GL_DRAW_ELEMENTS_TYPE.as_raw(),
-      (start as usize * mem::size_of::<T>()) as *const c_void,
+      (start * mem::size_of::<T>()) as *const c_void,
     )
   }
 }
@@ -432,13 +459,33 @@ impl AttribPtr {
 
 impl<T: crate::CorrespondingAttribType + CorrespondingAttribPtrType> crate::Attrib<T> {
   pub fn to_pointer(&self, type_: AttribPtrType) -> AttribPtr {
-    assert_eq!(type_.len, T::CORRESPONDING_ATTRIB_PTR_TYPE.len);
     if let Some(data_type) = self.data_type() {
-      assert_eq!(
-        type_.len as u32,
-        data_type.name.components() as u32 * data_type.array_len.unwrap_or(1)
-      );
+      let required_len = data_type.name.components() as u32 * data_type.array_len.unwrap_or(1);
+      if type_.len != required_len {
+        #[inline(never)]
+        #[cold]
+        #[track_caller]
+        fn attrib_ptr_len_mismatch_fail(
+          location: u32,
+          data_type: &crate::GlslType,
+          specified_len: u32,
+          required_len: u32,
+        ) -> ! {
+          let components = data_type.name.components();
+          let required_len_str = match data_type.array_len {
+            Some(array_len) => format!("{} * {} = {}", components, array_len, required_len),
+            None => format!("{}", components),
+          };
+          panic!(
+            "specified length ({}) for the attribute (location = {}) pointer type doesn't match \
+            the total number of numeric components required by the GLSL type `{}` ({})",
+            specified_len, location, data_type, required_len_str,
+          );
+        }
+        attrib_ptr_len_mismatch_fail(self.location(), data_type, type_.len, required_len);
+      }
     }
+
     AttribPtr::new(self.location(), type_)
   }
 
@@ -463,8 +510,8 @@ gl_enum!({
 });
 
 impl AttribPtrTypeName {
-  pub fn size(&self) -> u8 {
-    use mem::size_of;
+  pub const fn size(self) -> u8 {
+    use std::mem::size_of;
     let size: usize = match self {
       Self::I8 => size_of::<i8>(),
       Self::U8 => size_of::<u8>(),
@@ -473,7 +520,7 @@ impl AttribPtrTypeName {
       // Self::Fixed => size_of::<GLfixed>(),
       Self::F32 => size_of::<f32>(),
     };
-    assert!(size <= u8::MAX as usize);
+    // all of the above sizes fit in a byte
     size as u8
   }
 }

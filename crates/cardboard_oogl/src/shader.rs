@@ -1,8 +1,8 @@
 use crate::impl_prelude::*;
-use crate::CorrespondingAttribPtrType;
 use crate::TextureUnit;
 use cardboard_math::*;
 use prelude_plus::*;
+use std::any::type_name;
 
 gl_enum!({
   pub enum ShaderType {
@@ -318,6 +318,7 @@ impl Program {
 
   pub fn get_uniform<T: CorrespondingUniformType>(&self, name: &str) -> Uniform<T> {
     #[inline(never)]
+    #[track_caller]
     fn check_uniform_type(
       myself: &Program,
       name: &str,
@@ -341,7 +342,7 @@ impl Program {
     }
 
     let (location, data_type) =
-      check_uniform_type(&self, name, T::CORRESPONDING_UNIFORM_TYPES, std::any::type_name::<T>());
+      check_uniform_type(&self, name, T::CORRESPONDING_UNIFORM_TYPES, type_name::<T>());
     Uniform { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
 
@@ -351,6 +352,7 @@ impl Program {
 
   pub fn get_attrib<T: CorrespondingAttribType>(&self, name: &str) -> Attrib<T> {
     #[inline(never)]
+    #[track_caller]
     fn check_attrib_type(
       myself: &Program,
       name: &str,
@@ -616,7 +618,7 @@ pub struct Attrib<T: CorrespondingAttribType> {
 impl<T> !Send for Attrib<T> {}
 impl<T> !Sync for Attrib<T> {}
 
-impl<T: CorrespondingAttribType + CorrespondingAttribPtrType> Attrib<T> {
+impl<T: CorrespondingAttribType> Attrib<T> {
   #[inline(always)]
   pub fn location(&self) -> u32 { self.location }
   #[inline(always)]
