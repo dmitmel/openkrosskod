@@ -755,7 +755,6 @@ impl Game {
     let path = Path::new("screenshot.png");
     let size = self.globals.window_size_i;
     let mut pixels = vec![0; size.x as usize * size.y as usize * 4];
-
     info!(
       "Saving a screenshot to '{}', {}x{} RGBA, {} bytes for pixels",
       path.display(),
@@ -763,21 +762,7 @@ impl Game {
       size.y,
       pixels.len()
     );
-
-    unsafe {
-      use cardboard_oogl::raw_gl as gl;
-      let gl = self.globals.gl.raw_gl();
-      gl.ReadPixels(
-        0,
-        0,
-        i32::try_from(size.x).unwrap(),
-        i32::try_from(size.y).unwrap(),
-        gl::RGBA,
-        gl::UNSIGNED_BYTE,
-        pixels.as_mut_ptr() as *mut c_void,
-      );
-    }
-
+    self.globals.gl.read_pixels_rgba(size, &mut pixels);
     flip_rgba_image_data_vertically(size, &mut pixels);
 
     let file =
@@ -788,7 +773,6 @@ impl Game {
     encoder.set_color(png::ColorType::RGBA);
     encoder.set_depth(png::BitDepth::Eight);
     let mut writer = encoder.write_header().context("Failed to write the PNG header")?;
-
     writer.write_image_data(&pixels).context("Failed to write the encoded PNG data")?;
 
     Ok(())

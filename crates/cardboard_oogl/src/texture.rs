@@ -218,7 +218,7 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
 
   pub fn alloc_and_set(&self, level_of_detail: u32, data: &[T]) {
     let size = self.texture.size_at_level_of_detail(level_of_detail);
-    assert_texture_data_len(data.len(), size, self.texture.input_format);
+    check_texture_data_len(data.len(), size, self.texture.input_format);
     self.alloc_and_set_internal(level_of_detail, data.as_ptr());
   }
 
@@ -248,7 +248,7 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
   }
 
   pub fn set_slice(&self, level_of_detail: u32, offset: Vec2u32, size: Vec2u32, data: &[T]) {
-    assert_texture_data_len(data.len(), size, self.texture.input_format);
+    check_texture_data_len(data.len(), size, self.texture.input_format);
     // TODO: Add check of the rectangle formed by the offset and the size being
     // contained inside the texture size, somehow ignore it in `set`.
     unsafe {
@@ -268,7 +268,7 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
 }
 
 #[track_caller]
-fn assert_texture_data_len(data_len: usize, size: Vec2u32, format: TextureInputFormat) {
+pub(crate) fn check_texture_data_len(data_len: usize, size: Vec2u32, format: TextureInputFormat) {
   let expected_data_len = size.x as usize * size.y as usize * format.color_components() as usize;
   if data_len != expected_data_len {
     #[inline(never)]

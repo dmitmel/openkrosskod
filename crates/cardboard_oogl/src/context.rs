@@ -159,6 +159,22 @@ impl Context {
       )
     }
   }
+
+  // TODO: More read_pixels formats. Maybe.
+  pub fn read_pixels_rgba(&self, size: Vec2u32, out: &mut [u8]) {
+    crate::check_texture_data_len(out.len(), size, crate::TextureInputFormat::RGBA);
+    unsafe {
+      self.raw_gl.ReadPixels(
+        0,
+        0,
+        i32::try_from(size.x).unwrap(),
+        i32::try_from(size.y).unwrap(),
+        gl::RGBA,
+        gl::UNSIGNED_BYTE,
+        out.as_mut_ptr() as *mut c_void,
+      );
+    };
+  }
 }
 
 impl fmt::Debug for Context {
