@@ -45,6 +45,18 @@ impl InputState {
   pub fn is_key_unpressed(&self, key: Key) -> bool {
     self.prev_keyboard_state_table[key as usize] && !self.keyboard_state_table[key as usize]
   }
+
+  #[inline]
+  pub fn axis(&self, key_less: Key, key_more: Key) -> i8 {
+    let mut dir = 0;
+    if self.is_key_down(key_less) {
+      dir -= 1;
+    }
+    if self.is_key_down(key_more) {
+      dir += 1;
+    }
+    dir
+  }
 }
 
 macro_rules! generate_key_enum {

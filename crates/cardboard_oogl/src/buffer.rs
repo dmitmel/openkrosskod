@@ -305,7 +305,7 @@ where
   fn set_slice(&'obj self, offset: usize, data: &[T]) {
     let self_len = self.len();
     let slice_len = data.len();
-    assert!(offset < self_len);
+    assert!(offset <= self_len);
     assert!(offset + slice_len <= self_len);
     unsafe { self.__impl_buffer_sub_data(offset, slice_len, data.as_ptr()) };
   }
@@ -361,8 +361,9 @@ where
     start: usize,
     count: usize,
   ) {
-    assert!(start < self.len());
-    assert!(start + count <= self.len());
+    let self_len = self.len();
+    assert!(start <= self_len);
+    assert!(start + count <= self_len);
     unsafe { self.__impl_draw(mode, start, count) }
   }
 
@@ -429,7 +430,7 @@ impl AttribPtr {
   }
 }
 
-impl<T: CorrespondingAttribPtrType> crate::Attrib<T> {
+impl<T: crate::CorrespondingAttribType + CorrespondingAttribPtrType> crate::Attrib<T> {
   pub fn to_pointer(&self, type_: AttribPtrType) -> AttribPtr {
     assert_eq!(type_.len, T::CORRESPONDING_ATTRIB_PTR_TYPE.len);
     if let Some(data_type) = self.data_type() {
@@ -477,7 +478,7 @@ impl AttribPtrTypeName {
   }
 }
 
-pub trait CorrespondingAttribPtrType: crate::CorrespondingAttribType {
+pub trait CorrespondingAttribPtrType {
   const CORRESPONDING_ATTRIB_PTR_TYPE: AttribPtrType;
 }
 
@@ -493,8 +494,32 @@ macro_rules! impl_attrib_ptr_type {
   };
 }
 
+impl_attrib_ptr_type!(u8, (U8, 1));
+impl_attrib_ptr_type!(i8, (I8, 1));
+impl_attrib_ptr_type!(u16, (U16, 1));
+impl_attrib_ptr_type!(i16, (I16, 1));
 impl_attrib_ptr_type!(f32, (F32, 1));
+
+impl_attrib_ptr_type!(Vec2<u8>, (U8, 2));
+impl_attrib_ptr_type!(Vec2<i8>, (I8, 2));
+impl_attrib_ptr_type!(Vec2<u16>, (U16, 2));
+impl_attrib_ptr_type!(Vec2<i16>, (I16, 2));
 impl_attrib_ptr_type!(Vec2<f32>, (F32, 2));
+
+impl_attrib_ptr_type!(Vec3<u8>, (U8, 3));
+impl_attrib_ptr_type!(Vec3<i8>, (I8, 3));
+impl_attrib_ptr_type!(Vec3<u16>, (U16, 3));
+impl_attrib_ptr_type!(Vec3<i16>, (I16, 3));
 impl_attrib_ptr_type!(Vec3<f32>, (F32, 3));
+
+impl_attrib_ptr_type!(Vec4<u8>, (U8, 4));
+impl_attrib_ptr_type!(Vec4<i8>, (I8, 4));
+impl_attrib_ptr_type!(Vec4<u16>, (U16, 4));
+impl_attrib_ptr_type!(Vec4<i16>, (I16, 4));
 impl_attrib_ptr_type!(Vec4<f32>, (F32, 4));
+
+impl_attrib_ptr_type!(Color<u8>, (U8, 4));
+impl_attrib_ptr_type!(Color<i8>, (I8, 4));
+impl_attrib_ptr_type!(Color<u16>, (U16, 4));
+impl_attrib_ptr_type!(Color<i16>, (I16, 4));
 impl_attrib_ptr_type!(Color<f32>, (F32, 4));

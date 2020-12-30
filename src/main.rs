@@ -6,9 +6,12 @@ pub mod gen_idx; // TODO
 
 pub mod game_fs;
 pub mod globals;
-pub mod image_decoding_speedrun;
 pub mod input;
+pub mod profiling;
 pub mod renderer;
+
+pub mod game_of_life;
+pub mod image_decoding_speedrun;
 
 use prelude_plus::*;
 use sdl2::event::{Event, WindowEvent};
@@ -22,6 +25,9 @@ use crate::game_fs::*;
 use crate::globals::*;
 use crate::input::Key;
 use crate::renderer::*;
+
+#[cfg(feature = "game_of_life")]
+use crate::game_of_life::GameOfLife;
 
 const GAME_NAME: &str = "openKrossKod";
 // const GAME_NAME: &str = env!("CARGO_PKG_NAME");
@@ -163,6 +169,9 @@ fn try_main() -> AnyResult<()> {
   let font_texture = load_texture_asset(&globals, "font.png", oogl::TextureFilter::Nearest)?;
 
   let renderer = Renderer::init(globals.share()).context("Failed to initialize the renderer")?;
+  #[cfg(feature = "game_of_life")]
+  let game_of_life =
+    GameOfLife::init(globals.share()).context("Failed to initialize GameOfLife")?;
 
   globals.gl.release_shader_compiler();
 
@@ -193,6 +202,8 @@ fn try_main() -> AnyResult<()> {
     window,
     event_pump,
     renderer,
+    #[cfg(feature = "game_of_life")]
+    game_of_life,
 
     ball_texture,
     font: Font {
@@ -308,29 +319,20 @@ enum RacketController {
 
 impl RacketController {
   fn get_movement_direction(&mut self, globals: &Globals, racket: &Racket, ball: &Ball) -> f32 {
-    let mut dir = 0.0;
-
     match self {
-      Self::Player { key_up, key_down } => {
-        if globals.input_state.is_key_down(*key_up) {
-          dir += 1.0;
-        }
-        if globals.input_state.is_key_down(*key_down) {
-          dir -= 1.0;
-        }
-      }
+      Self::Player { key_up, key_down } => globals.input_state.axis(*key_down, *key_up) as f32,
 
       Self::Bot => {
         let vision_dist = BOT_RACKET_VISION_DISTANCE * globals.window_size.x;
         if ball.coll.vel.x * racket.side > 0.0
           && (racket.coll.pos.x - ball.coll.pos.x).abs() <= vision_dist
         {
-          dir = (ball.coll.pos.y - racket.coll.pos.y).signum();
+          (ball.coll.pos.y - racket.coll.pos.y).signum()
+        } else {
+          0.0
         }
       }
     }
-
-    dir
   }
 }
 
@@ -344,6 +346,8 @@ struct Game {
   pub window: Window,
   pub event_pump: EventPump,
   pub renderer: Renderer,
+  #[cfg(feature = "game_of_life")]
+  pub game_of_life: GameOfLife,
 
   pub ball_texture: oogl::Texture2D,
   pub font: Font,
@@ -377,6 +381,9 @@ impl Game {
       }
 
       if !idling {
+        #[cfg(feature = "gl_debug_all_commands")]
+        println!("================ [OpenGL] ================");
+
         self.early_update().context("Error in early_update")?;
 
         fixed_update_time_accumulator += delta_time;
@@ -390,9 +397,6 @@ impl Game {
         }
 
         self.update().context("Error in update")?;
-
-        #[cfg(feature = "gl_debug_all_commands")]
-        println!("================ [OpenGL] ================");
 
         self.render().context("Error in render")?;
         self.window.gl_swap_window();
@@ -522,7 +526,11 @@ impl Game {
     Ok(())
   }
 
-  pub fn update(&mut self) -> AnyResult<()> { Ok(()) }
+  pub fn update(&mut self) -> AnyResult<()> {
+    #[cfg(feature = "game_of_life")]
+    self.game_of_life.update();
+    Ok(())
+  }
 
   pub fn fixed_update(&mut self) -> AnyResult<()> {
     self.debug_vectors.clear();
@@ -645,83 +653,94 @@ impl Game {
     }
     gl.clear(oogl::ClearFlags::COLOR);
 
-    self.renderer.prepare();
-    let window_size = self.globals.window_size;
-
-    let GameState { ball, left_racket, right_racket, .. } = &self.state;
-
-    for (text, side, align) in &[
-      (format!("{}", left_racket.score).as_str(), -1.0, TextAlign::End),
-      (":", 0.0, TextAlign::Center),
-      (format!("{}", right_racket.score).as_str(), 1.0, TextAlign::Start),
-    ] {
-      let text_block = &mut TextBlock {
-        text,
-        scale: SCORE_LABEL_TEXT_SCALE,
-        character_spacing: SCORE_LABEL_CHAR_SPACING,
-        horizontal_align: *align,
-        vertical_align: TextAlign::Start,
-      };
-      let (_text_block_size, char_spacing) = self.font.measure_size(text_block);
-      let pos = vec2(side * char_spacing.x / 2.0, window_size.y / 2.0);
-      self.renderer.draw_text(&mut self.font, pos, text_block);
+    #[cfg(feature = "game_of_life")]
+    {
+      self.game_of_life.render();
+      self.renderer.prepare();
+      self.game_of_life.render_debug_info(&mut self.renderer, &mut self.font);
+      self.renderer.finish();
     }
 
-    for racket in &[left_racket, right_racket] {
+    #[cfg(not(feature = "disable_pong"))]
+    {
+      self.renderer.prepare();
+      let window_size = self.globals.window_size;
+
+      let GameState { ball, left_racket, right_racket, .. } = &self.state;
+
+      for (text, side, align) in &[
+        (format!("{}", left_racket.score).as_str(), -1.0, TextAlign::End),
+        (":", 0.0, TextAlign::Center),
+        (format!("{}", right_racket.score).as_str(), 1.0, TextAlign::Start),
+      ] {
+        let text_block = &mut TextBlock {
+          text,
+          scale: SCORE_LABEL_TEXT_SCALE,
+          character_spacing: SCORE_LABEL_CHAR_SPACING,
+          horizontal_align: *align,
+          vertical_align: TextAlign::Start,
+        };
+        let (_text_block_size, char_spacing) = self.font.measure_size(text_block);
+        let pos = vec2(side * char_spacing.x / 2.0, window_size.y / 2.0);
+        self.renderer.draw_text(&mut self.font, pos, text_block);
+      }
+
+      for racket in &[left_racket, right_racket] {
+        self.renderer.draw_shape(&mut Shape {
+          type_: ShapeType::Rectangle,
+          pos: racket.coll.pos,
+          size: racket.coll.size,
+          rotation: 0.0,
+          fill: ShapeFill::Color(RACKET_COLOR),
+          fill_clipping: None,
+        });
+      }
+
       self.renderer.draw_shape(&mut Shape {
-        type_: ShapeType::Rectangle,
-        pos: racket.coll.pos,
-        size: racket.coll.size,
-        rotation: 0.0,
-        fill: ShapeFill::Color(RACKET_COLOR),
-        fill_clipping: None,
-      });
-    }
-
-    self.renderer.draw_shape(&mut Shape {
-      type_: ShapeType::Ellipse,
-      pos: ball.coll.pos,
-      size: ball.coll.size,
-      rotation: ball.rotation,
-      fill: ShapeFill::Texture(&mut self.ball_texture),
-      fill_clipping: None,
-    });
-
-    // TODO: remove
-    for &(start_point, vector, color) in &self.debug_vectors {
-      let angle = vector.angle_from_x_axis();
-
-      self.renderer.draw_shape(&mut Shape {
-        type_: ShapeType::Rectangle,
-        pos: start_point + vector / 2.0,
-        size: vec2(vector.magnitude(), 5.0),
-        rotation: angle,
-        fill: ShapeFill::Color(color),
+        type_: ShapeType::Ellipse,
+        pos: ball.coll.pos,
+        size: ball.coll.size,
+        rotation: ball.rotation,
+        fill: ShapeFill::Texture(&mut self.ball_texture),
         fill_clipping: None,
       });
 
-      self.renderer.draw_shape(&mut Shape {
-        type_: ShapeType::Rectangle,
-        pos: start_point + vector,
-        size: vec2n(32.0),
-        rotation: angle,
-        fill: ShapeFill::Color(color),
-        fill_clipping: None,
-      });
-    }
+      // TODO: remove
+      for &(start_point, vector, color) in &self.debug_vectors {
+        let angle = vector.angle_from_x_axis();
 
-    if !self.globals.window_is_focused {
-      self.renderer.draw_shape(&mut Shape {
-        type_: ShapeType::Rectangle,
-        pos: vec2n(0.0),
-        size: window_size,
-        rotation: 0.0,
-        fill: ShapeFill::Color(color(0.0, 0.0, 0.0, 0.6)),
-        fill_clipping: None,
-      });
-    }
+        self.renderer.draw_shape(&mut Shape {
+          type_: ShapeType::Rectangle,
+          pos: start_point + vector / 2.0,
+          size: vec2(vector.magnitude(), 5.0),
+          rotation: angle,
+          fill: ShapeFill::Color(color),
+          fill_clipping: None,
+        });
 
-    self.renderer.finish();
+        self.renderer.draw_shape(&mut Shape {
+          type_: ShapeType::Rectangle,
+          pos: start_point + vector,
+          size: vec2n(32.0),
+          rotation: angle,
+          fill: ShapeFill::Color(color),
+          fill_clipping: None,
+        });
+      }
+
+      if !self.globals.window_is_focused {
+        self.renderer.draw_shape(&mut Shape {
+          type_: ShapeType::Rectangle,
+          pos: vec2n(0.0),
+          size: window_size,
+          rotation: 0.0,
+          fill: ShapeFill::Color(color(0.0, 0.0, 0.0, 0.6)),
+          fill_clipping: None,
+        });
+      }
+
+      self.renderer.finish();
+    }
 
     #[cfg(feature = "screenshot")]
     if self.globals.input_state.is_key_pressed(Key::F8) {

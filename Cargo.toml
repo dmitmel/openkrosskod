@@ -39,3 +39,7 @@ default = ["screenshot"]
 
 gl_debug_all_commands = ["cardboard_oogl/debug_all_commands"]
 screenshot = ["png/png-encoding"]
+
+# complex demos
+disable_pong = []
+game_of_life = ["disable_pong"]

@@ -20,14 +20,13 @@ pub struct Renderer {
 
 impl Renderer {
   pub fn init(globals: SharedGlobals) -> AnyResult<Self> {
+    use oogl::ShaderType;
     let common_vertex_shader =
-      load_shader_asset(&globals, "shaders/shape.vert.glsl", oogl::ShaderType::Vertex)?;
-
+      load_shader_asset(&globals, "shaders/shape.vert.glsl", ShaderType::Vertex)?;
     let rectangle_fragment_shader =
-      load_shader_asset(&globals, "shaders/rectangle.frag.glsl", oogl::ShaderType::Fragment)?;
-
+      load_shader_asset(&globals, "shaders/rectangle.frag.glsl", ShaderType::Fragment)?;
     let ellipse_fragment_shader =
-      load_shader_asset(&globals, "shaders/ellipse.frag.glsl", oogl::ShaderType::Fragment)?;
+      load_shader_asset(&globals, "shaders/ellipse.frag.glsl", ShaderType::Fragment)?;
 
     let rectangle_program = load_program_asset(
       &globals,

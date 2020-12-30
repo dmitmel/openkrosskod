@@ -17,6 +17,10 @@ pub use std::io::{self, BufRead, BufReader, BufWriter, Read, Seek, Write};
 pub use std::iter::{self, FromIterator};
 pub use std::marker::PhantomData;
 pub use std::mem;
+pub use std::num::{
+  NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroIsize, NonZeroU16, NonZeroU32, NonZeroU64,
+  NonZeroU8, NonZeroUsize,
+};
 pub use std::ops::{
   Deref, DerefMut, Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive,
 };
@@ -56,4 +60,12 @@ pub fn breakpoint() {
     #[cfg(unix)]
     nix::sys::signal::raise(nix::sys::signal::SIGINT).unwrap();
   }
+}
+
+#[macro_export]
+macro_rules! const_assert {
+  ($cond:expr) => {
+    #[doc(hidden)]
+    const _: [(); (($cond) == true) as usize] = [()];
+  };
 }
