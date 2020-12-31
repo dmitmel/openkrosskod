@@ -244,26 +244,36 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
   }
 
   pub fn set(&self, level_of_detail: u32, data: &[T]) {
-    self.set_slice(level_of_detail, vec2n(0), self.texture.size(), data);
+    let size = self.texture.size();
+    check_texture_data_len(data.len(), size, self.texture.input_format);
+    unsafe { self.__impl_sub_image_2d(level_of_detail, vec2n(0), size, data.as_ptr()) };
   }
 
   pub fn set_slice(&self, level_of_detail: u32, offset: Vec2u32, size: Vec2u32, data: &[T]) {
     check_texture_data_len(data.len(), size, self.texture.input_format);
     // TODO: Add check of the rectangle formed by the offset and the size being
-    // contained inside the texture size, somehow ignore it in `set`.
-    unsafe {
-      self.ctx().raw_gl().TexSubImage2D(
-        Self::BIND_TARGET.as_raw(),
-        i32::try_from(level_of_detail).unwrap(),
-        i32::try_from(offset.x).unwrap(),
-        i32::try_from(offset.y).unwrap(),
-        i32::try_from(size.x).unwrap(),
-        i32::try_from(size.y).unwrap(),
-        self.texture.input_format.as_raw(),
-        T::GL_TEXTURE_INPUT_DATA_TYPE.as_raw(),
-        data.as_ptr() as *const _,
-      );
-    }
+    // contained inside the texture size.
+    unsafe { self.__impl_sub_image_2d(level_of_detail, offset, size, data.as_ptr()) };
+  }
+
+  unsafe fn __impl_sub_image_2d(
+    &self,
+    level_of_detail: u32,
+    offset: Vec2u32,
+    size: Vec2u32,
+    data: *const T,
+  ) {
+    self.ctx().raw_gl().TexSubImage2D(
+      Self::BIND_TARGET.as_raw(),
+      i32::try_from(level_of_detail).unwrap(),
+      i32::try_from(offset.x).unwrap(),
+      i32::try_from(offset.y).unwrap(),
+      i32::try_from(size.x).unwrap(),
+      i32::try_from(size.y).unwrap(),
+      self.texture.input_format.as_raw(),
+      T::GL_TEXTURE_INPUT_DATA_TYPE.as_raw(),
+      data as *const c_void,
+    );
   }
 }
 

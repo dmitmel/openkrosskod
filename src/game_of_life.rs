@@ -1,6 +1,3 @@
-// NOTE: Textures should be used instead for this kind of task. For the
-// purposes of the demonstration, however, I used meshes.
-
 use cardboard_math::*;
 use cardboard_oogl as oogl;
 use cardboard_oogl::traits::*;
@@ -38,14 +35,13 @@ fn simulation_rule(is_alive: bool, alive_neighbors: u8) -> bool {
 #[derive(Copy, Debug, Clone, Default)]
 struct Vertex {
   pos: Vec2u8,
-  state: u8,
 }
 
 #[derive(Debug)]
 pub struct GameOfLife {
   globals: SharedGlobals,
-  chunk_vertex_bufs: Vec<oogl::VertexBuffer<Vertex>>,
-  element_buf: oogl::ElementBuffer<u16>,
+  vertex_buf: oogl::VertexBuffer<Vertex>,
+  chunk_textures: Vec<oogl::Texture2D<u8>>,
   program: oogl::Program,
   program_reflection: ProgramReflection,
 
@@ -55,11 +51,10 @@ pub struct GameOfLife {
 
   current_generation: Vec<u8>,
   next_generation: Vec<u8>,
-  mesh_vertices: Vec<Vertex>,
-  mesh_indices: Vec<u16>,
+  texture_data: Vec<u8>,
 
   simulation_times: AverageTimeSampler,
-  mesh_rebuild_times: AverageTimeSampler,
+  texture_refill_times: AverageTimeSampler,
 }
 
 impl GameOfLife {
@@ -78,29 +73,36 @@ impl GameOfLife {
       let reflection = &program_reflection;
       reflection.u_global_color.set(&bound_program, &GLOBAL_COLOR);
       reflection.u_cell_size.set(&bound_program, &CELL_SIZE);
+      reflection.u_chunk_size.set(&bound_program, &Vec2f::cast_from(CHUNK_SIZE));
     }
 
-    let vertex_attribs = vec![
-      program_reflection.a_pos.to_pointer_simple_with_cast(oogl::AttribPtrTypeName::U8),
-      program_reflection.a_state.to_pointer_simple_with_cast(oogl::AttribPtrTypeName::U8),
-    ];
+    let mut vertex_buf = oogl::VertexBuffer::new(
+      globals.gl.share(),
+      oogl::BufferUsageHint::StaticDraw,
+      vec![program_reflection.a_pos.to_pointer_simple_with_cast(oogl::AttribPtrTypeName::U8)],
+    );
+    vertex_buf.set_debug_label(b"GameOfLife.vertex_buf");
+    vertex_buf.bind().alloc_and_set(&[
+      Vertex { pos: vec2(0, 0) },
+      Vertex { pos: vec2(1, 0) },
+      Vertex { pos: vec2(1, 1) },
+      Vertex { pos: vec2(0, 1) },
+    ]);
 
-    let buf_usage_hint = oogl::BufferUsageHint::StreamDraw;
-
-    let mesh_indices = vec![0; CHUNK_SIZE.x as usize * CHUNK_SIZE.y as usize * 6];
-    let mut element_buf = oogl::ElementBuffer::new(globals.gl.share(), buf_usage_hint);
-    element_buf.set_debug_label(b"GameOfLife.element_buf");
-    element_buf.bind().alloc(mesh_indices.len());
-
-    let mesh_vertices = vec![Vertex::default(); CHUNK_SIZE.x as usize * CHUNK_SIZE.y as usize * 4];
-    let mut chunk_vertex_bufs =
-      Vec::with_capacity(CHUNKS_COUNT.x as usize * CHUNKS_COUNT.y as usize);
-    for i in 0..chunk_vertex_bufs.capacity() {
-      let mut vertex_buf =
-        oogl::VertexBuffer::new(globals.gl.share(), buf_usage_hint, vertex_attribs.clone());
-      vertex_buf.set_debug_label(format!("GameOfLife.chunk_vertex_bufs[{}]", i).as_bytes());
-      vertex_buf.bind().alloc(mesh_vertices.len());
-      chunk_vertex_bufs.push(vertex_buf);
+    let texture_data = vec![0; CHUNK_SIZE.x as usize * CHUNK_SIZE.y as usize];
+    let mut chunk_textures = Vec::with_capacity(CHUNKS_COUNT.x as usize * CHUNKS_COUNT.y as usize);
+    for i in 0..chunk_textures.capacity() {
+      let unit = None;
+      let mut tex =
+        oogl::Texture2D::new(globals.gl.share(), unit, oogl::TextureInputFormat::Luminance, None);
+      tex.set_debug_label(format!("GameOfLife.chunk_textures[{}]", i).as_bytes());
+      {
+        let bound_tex = tex.bind(unit);
+        bound_tex.set_size(Vec2u32::cast_from(CHUNK_SIZE));
+        bound_tex.set_filters(oogl::TextureFilter::Nearest, None);
+        bound_tex.alloc(0);
+      }
+      chunk_textures.push(tex);
     }
 
     let next_generation = vec![0; GRID_SIZE.x as usize * GRID_SIZE.y as usize];
@@ -108,8 +110,8 @@ impl GameOfLife {
 
     let mut myself = Self {
       globals,
-      chunk_vertex_bufs,
-      element_buf,
+      vertex_buf,
+      chunk_textures,
       program,
       program_reflection,
 
@@ -119,14 +121,13 @@ impl GameOfLife {
 
       current_generation,
       next_generation,
-      mesh_vertices,
-      mesh_indices,
+      texture_data,
 
       simulation_times: AverageTimeSampler::new(30),
-      mesh_rebuild_times: AverageTimeSampler::new(30),
+      texture_refill_times: AverageTimeSampler::new(30),
     };
     myself.reset_simulation();
-    myself.rebuild_mesh();
+    myself.refill_textures();
     Ok(myself)
   }
 
@@ -194,48 +195,22 @@ impl GameOfLife {
     alive_neighbors
   }
 
-  fn rebuild_mesh(&mut self) {
+  fn refill_textures(&mut self) {
     let start_time = Instant::now();
 
-    self.fill_element_buffer();
-    let mut vertex_buf_idx = 0;
+    let mut texture_idx = 0;
     for chunk_y in 0..CHUNKS_COUNT.y {
       for chunk_x in 0..CHUNKS_COUNT.x {
         let chunk_pos = vec2(chunk_x, chunk_y);
-        self.fill_chunk_vertex_buf(chunk_pos, vertex_buf_idx);
-        vertex_buf_idx += 1;
+        self.fill_chunk_texture(chunk_pos, texture_idx);
+        texture_idx += 1;
       }
     }
 
-    self.mesh_rebuild_times.push(start_time.elapsed());
+    self.texture_refill_times.push(start_time.elapsed());
   }
 
-  fn fill_element_buffer(&mut self) {
-    let mut i = 0;
-
-    let mut vert_idx = 0;
-    for _y in 0..CHUNK_SIZE.y {
-      for _x in 0..CHUNK_SIZE.x {
-        let j = i + 6;
-        self.mesh_indices[i..j].copy_from_slice(&[
-          vert_idx,
-          vert_idx + 1,
-          vert_idx + 2,
-          vert_idx + 2,
-          vert_idx + 3,
-          vert_idx,
-        ]);
-        vert_idx = vert_idx.wrapping_add(4);
-        i = j;
-      }
-    }
-
-    let bound_buf = self.element_buf.bind();
-    bound_buf.orphan_data();
-    bound_buf.set(&self.mesh_indices);
-  }
-
-  fn fill_chunk_vertex_buf(&mut self, chunk_pos: Vec2u32, vertex_buf: usize) {
+  fn fill_chunk_texture(&mut self, chunk_pos: Vec2u32, texture: usize) {
     let chunk_contents_offset: Vec2u32 = chunk_pos * Vec2u32::cast_from(CHUNK_SIZE);
 
     let mut i = 0;
@@ -244,19 +219,13 @@ impl GameOfLife {
         let chunk_local_pos: Vec2u8 = vec2(chunk_local_x, chunk_local_y);
         let pos: Vec2u32 = Vec2u32::cast_from(chunk_local_pos) + chunk_contents_offset;
         let state = self.current_generation_get(pos);
-
-        const CORNER_OFFSETS: [Vec2u8; 4] = [vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1)];
-        for &offset in &CORNER_OFFSETS {
-          self.mesh_vertices[i] = Vertex { pos: chunk_local_pos + offset, state };
-          i += 1;
-        }
+        self.texture_data[i] = state;
+        i += 1;
       }
     }
 
-    let vertex_buf = &mut self.chunk_vertex_bufs[vertex_buf];
-    let bound_buf = vertex_buf.bind();
-    bound_buf.orphan_data();
-    bound_buf.set(&self.mesh_vertices);
+    let texture = &mut self.chunk_textures[texture];
+    texture.bind(None).set(0, &self.texture_data);
   }
 
   pub fn update(&mut self) {
@@ -292,7 +261,7 @@ impl GameOfLife {
   }
 
   pub fn render(&mut self) {
-    self.rebuild_mesh();
+    self.refill_textures();
 
     let bound_program = self.program.bind();
     let reflection = &self.program_reflection;
@@ -303,32 +272,27 @@ impl GameOfLife {
       reflection.u_window_size.set(&bound_program, &self.globals.window_size);
     }
 
-    let bound_ebo = self.element_buf.bind();
-    let indices_count = self.mesh_indices.len();
+    let bound_vertex_buf = self.vertex_buf.bind();
+    bound_vertex_buf.enable_attribs();
+    bound_vertex_buf.configure_attribs();
 
-    let mut vbo_idx = 0;
+    let mut texture_idx = 0;
     for chunk_y in 0..CHUNKS_COUNT.y {
       for chunk_x in 0..CHUNKS_COUNT.x {
         let chunk_contents_offset: Vec2u32 =
           vec2(chunk_x, chunk_y) * Vec2u32::cast_from(CHUNK_SIZE);
         reflection.u_chunk_offset.set(&bound_program, &Vec2f::cast_from(chunk_contents_offset));
 
-        let is_first = vbo_idx == 0;
-        let is_last = vbo_idx == self.chunk_vertex_bufs.len() - 1;
-        let bound_vbo = self.chunk_vertex_bufs[vbo_idx].bind();
+        let bound_chunk_texture = self.chunk_textures[texture_idx].bind(None);
+        reflection.u_chunk_texture.set(&bound_program, &bound_chunk_texture.unit());
 
-        if is_first {
-          bound_vbo.enable_attribs();
-        }
-        bound_vbo.configure_attribs();
-        bound_ebo.draw_slice(&bound_program, oogl::DrawPrimitive::Triangles, ..indices_count);
-        if is_last {
-          bound_vbo.disable_attribs();
-        }
+        bound_vertex_buf.draw(&bound_program, oogl::DrawPrimitive::TriangleFan);
 
-        vbo_idx += 1;
+        texture_idx += 1;
       }
     }
+
+    bound_vertex_buf.disable_attribs();
   }
 
   pub fn render_debug_info(
@@ -336,13 +300,13 @@ impl GameOfLife {
     renderer: &mut renderer::Renderer,
     font: &mut renderer::Font,
   ) {
-    let avg_mesh_rebuild_time = self.mesh_rebuild_times.average_micros() as f64 / 1000.0;
+    let avg_texture_refill_time = self.texture_refill_times.average_micros() as f64 / 1000.0;
     let avg_simulation_time = self.simulation_times.average_micros() as f64 / 1000.0;
 
     let mut text_block_offset = Vec2f::ZERO;
     for &text in &[
-      format!("   simulation time: {:.03?} ms", avg_simulation_time).as_str(),
-      format!(" mesh rebuild time: {:.03?} ms", avg_mesh_rebuild_time).as_str(),
+      format!(" simulation time: {:.03?} ms", avg_simulation_time).as_str(),
+      format!(" tex refill time: {:.03?} ms", avg_texture_refill_time).as_str(),
     ] {
       let text_block = &mut renderer::TextBlock {
         text,
@@ -363,14 +327,16 @@ oogl::program_reflection_block!({
   #[derive(Debug)]
   struct ProgramReflection {
     a_pos: oogl::Attrib<Vec2f>,
-    a_state: oogl::Attrib<f32>,
 
     u_global_color: oogl::Uniform<Colorf>,
     u_cell_size: oogl::Uniform<Vec2f>,
+    u_chunk_size: oogl::Uniform<Vec2f>,
 
+    u_window_size: oogl::Uniform<Vec2f>,
     u_camera_pos: oogl::Uniform<Vec2f>,
     u_camera_zoom: oogl::Uniform<f32>,
+
     u_chunk_offset: oogl::Uniform<Vec2f>,
-    u_window_size: oogl::Uniform<Vec2f>,
+    u_chunk_texture: oogl::Uniform<u16>,
   }
 });
