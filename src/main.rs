@@ -50,7 +50,7 @@ fn main() {
     if log_enabled!(LogLevel::Error) {
       error!("{:?}", err);
     } else {
-      eprintln!("ERROR: ${:?}", err);
+      eprintln!("ERROR: {:?}", err);
     }
   }
 }
