@@ -1,4 +1,4 @@
-#![feature(negative_impls, range_bounds_assert_len)]
+#![feature(negative_impls, slice_range)]
 #![deny(missing_debug_implementations)]
 #![allow(clippy::missing_safety_doc)]
 

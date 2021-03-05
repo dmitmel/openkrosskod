@@ -319,7 +319,7 @@ where
 
   fn set_slice(&'obj self, range: impl RangeBounds<usize>, data: &[T]) {
     let slice_len = data.len();
-    let normalized_range: Range<usize> = range.assert_len(self.len());
+    let normalized_range: Range<usize> = slice::range(range, ..self.len());
     let offset = normalized_range.start;
     let range_len = normalized_range.end - normalized_range.start;
     if slice_len != range_len {
@@ -388,7 +388,7 @@ where
     mode: DrawPrimitive,
     range: impl RangeBounds<usize>,
   ) {
-    let normalized_range: Range<usize> = range.assert_len(self.len());
+    let normalized_range: Range<usize> = slice::range(range, ..self.len());
     let start = normalized_range.start;
     let count = normalized_range.end - normalized_range.start;
     unsafe { self.__impl_draw(mode, start, count) }
