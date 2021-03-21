@@ -15,9 +15,7 @@ jobs:
         id: install_rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
           components: rustfmt, clippy
-          override: true
       - name: Install SDL2
         run: sudo apt-get install libsdl2-dev
 
