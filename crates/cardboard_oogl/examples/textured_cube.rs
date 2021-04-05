@@ -25,7 +25,11 @@ struct Vertex {
 
 fn main() {
   let (_sdl_context, _video_subsystem, _sdl_gl_ctx, window, mut event_pump, gl) =
-    common::prepare_example_gl_context("textured_cube", vec2(800, 600));
+    common::prepare_example_gl_context(common::ExampleConfig {
+      name: "textured_cube",
+      window_size: vec2(800, 600),
+      ..Default::default()
+    });
 
   let vs = common::compile_shader(gl.share(), VS_SRC, ShaderType::Vertex);
   let fs = common::compile_shader(gl.share(), FS_SRC, ShaderType::Fragment);

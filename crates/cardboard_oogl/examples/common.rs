@@ -10,9 +10,15 @@ use cardboard_oogl::*;
 #[allow(dead_code)]
 fn main() {}
 
+#[derive(Debug, Default)]
+pub struct ExampleConfig {
+  pub name: &'static str,
+  pub window_size: Vec2u32,
+  pub multisampling: bool,
+}
+
 pub fn prepare_example_gl_context(
-  example_name: &'static str,
-  window_size: Vec2u32,
+  config: ExampleConfig,
 ) -> (
   sdl2::Sdl,
   sdl2::VideoSubsystem,
@@ -27,10 +33,14 @@ pub fn prepare_example_gl_context(
   let gl_attr = video_subsystem.gl_attr();
   gl_attr.set_context_profile(GLProfile::GLES);
   gl_attr.set_context_version(2, 0);
+  if config.multisampling {
+    gl_attr.set_multisample_buffers(1);
+    gl_attr.set_multisample_samples(4);
+  }
 
-  let window_title = format!("{} {} example", env!("CARGO_PKG_NAME"), example_name);
+  let window_title = format!("{} {} example", env!("CARGO_PKG_NAME"), config.name);
   let window = video_subsystem
-    .window(&window_title, window_size.x, window_size.y)
+    .window(&window_title, config.window_size.x, config.window_size.y)
     .resizable()
     .opengl()
     .allow_highdpi()
