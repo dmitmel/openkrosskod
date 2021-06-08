@@ -43,3 +43,4 @@ screenshot = ["png/png-encoding"]
 # complex demos
 disable_pong = []
 game_of_life = ["disable_pong"]
+mandelbrot = ["disable_pong"]

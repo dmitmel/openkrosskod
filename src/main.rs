@@ -12,6 +12,7 @@ pub mod renderer;
 
 pub mod game_of_life;
 pub mod image_decoding_speedrun;
+pub mod mandelbrot;
 pub mod pong;
 
 use prelude_plus::*;
@@ -31,6 +32,8 @@ use crate::pong::Pong;
 
 #[cfg(feature = "game_of_life")]
 use crate::game_of_life::GameOfLife;
+#[cfg(feature = "mandelbrot")]
+use crate::mandelbrot::Mandelbrot;
 
 const GAME_NAME: &str = "openKrossKod";
 // const GAME_NAME: &str = env!("CARGO_PKG_NAME");
@@ -153,6 +156,8 @@ fn try_main() -> AnyResult<()> {
   #[cfg(feature = "game_of_life")]
   let game_of_life =
     GameOfLife::init(globals.share()).context("Failed to initialize GameOfLife")?;
+  #[cfg(feature = "mandelbrot")]
+  let mandelbrot = Mandelbrot::init(globals.share()).context("Failed to initialize Mandelbrot")?;
 
   globals.gl.release_shader_compiler();
 
@@ -169,6 +174,8 @@ fn try_main() -> AnyResult<()> {
     pong,
     #[cfg(feature = "game_of_life")]
     game_of_life,
+    #[cfg(feature = "mandelbrot")]
+    mandelbrot,
   };
 
   info!("Core subsystems have been initialized, starting the game loop...");
@@ -191,6 +198,8 @@ struct Game {
   pub pong: Pong,
   #[cfg(feature = "game_of_life")]
   pub game_of_life: GameOfLife,
+  #[cfg(feature = "mandelbrot")]
+  pub mandelbrot: Mandelbrot,
 }
 
 impl Game {
@@ -296,6 +305,16 @@ impl Game {
           globals.window_is_focused = false;
         }
 
+        Event::Window { window_id, win_event: WindowEvent::Leave, .. }
+          if window_id == main_window_id =>
+        {
+          globals.input_state.set_key_down(Key::MouseLeft, false);
+          globals.input_state.set_key_down(Key::MouseMiddle, false);
+          globals.input_state.set_key_down(Key::MouseRight, false);
+          globals.input_state.set_key_down(Key::MouseX1, false);
+          globals.input_state.set_key_down(Key::MouseX2, false);
+        }
+
         Event::Window { window_id, win_event: WindowEvent::SizeChanged(..), .. }
           if window_id == main_window_id =>
         {
@@ -364,6 +383,10 @@ impl Game {
   pub fn update(&mut self) -> AnyResult<()> {
     #[cfg(feature = "game_of_life")]
     self.game_of_life.update();
+
+    #[cfg(feature = "mandelbrot")]
+    self.mandelbrot.update();
+
     Ok(())
   }
 
@@ -386,6 +409,14 @@ impl Game {
       self.game_of_life.render();
       self.renderer.prepare();
       self.game_of_life.render_debug_info(&mut self.renderer, &mut self.pong.font);
+      self.renderer.finish();
+    }
+
+    #[cfg(feature = "mandelbrot")]
+    {
+      self.mandelbrot.render();
+      self.renderer.prepare();
+      self.mandelbrot.render_debug_info(&mut self.renderer, &mut self.pong.font);
       self.renderer.finish();
     }
 
