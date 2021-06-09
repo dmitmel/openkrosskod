@@ -64,14 +64,21 @@ impl Mandelbrot {
       Vertex { pos: vec2(-1.0, -1.0) },
     ]);
 
-    Ok(Self {
+    let mut myself = Self {
       globals,
       vertex_buf,
       program,
       program_reflection,
       camera_pos: Vec2f::ZERO,
-      camera_zoom: 1.0,
-    })
+      camera_zoom: 0.0,
+    };
+    myself.reset_view();
+    Ok(myself)
+  }
+
+  fn reset_view(&mut self) {
+    self.camera_pos = Vec2f::ZERO;
+    self.camera_zoom = 1.0;
   }
 
   pub fn update(&mut self) {
@@ -87,6 +94,10 @@ impl Mandelbrot {
 
     if self.globals.input_state.is_key_down(Key::MouseLeft) {
       self.camera_pos -= self.globals.input_state.delta_mouse_pos / self.camera_zoom;
+    }
+
+    if self.globals.input_state.is_key_pressed(Key::R) {
+      self.reset_view();
     }
   }
 

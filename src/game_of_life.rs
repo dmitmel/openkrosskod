@@ -116,8 +116,8 @@ impl GameOfLife {
       program_reflection,
 
       prev_simulation_time: 0.0,
-      camera_pos: Vec2f::cast_from(GRID_SIZE) * CELL_SIZE * 0.5,
-      camera_zoom: 1.0,
+      camera_pos: Vec2f::ZERO,
+      camera_zoom: 0.0,
 
       current_generation,
       next_generation,
@@ -126,9 +126,15 @@ impl GameOfLife {
       simulation_times: AverageTimeSampler::new(30),
       texture_refill_times: AverageTimeSampler::new(30),
     };
+    myself.reset_view();
     myself.reset_simulation();
     myself.refill_textures();
     Ok(myself)
+  }
+
+  fn reset_view(&mut self) {
+    self.camera_pos = Vec2f::cast_from(GRID_SIZE) * CELL_SIZE * 0.5;
+    self.camera_zoom = 1.0;
   }
 
   fn reset_simulation(&mut self) {
@@ -253,6 +259,10 @@ impl GameOfLife {
       dir * CAMERA_MOVEMENT_SPEED_FROM_KEYBOARD * self.globals.delta_time as f32
     };
     self.camera_pos += camera_movement / self.camera_zoom;
+
+    if self.globals.input_state.is_key_pressed(Key::R) {
+      self.reset_view();
+    }
 
     if self.globals.time >= self.prev_simulation_time + SIMULATION_INTERVAL {
       self.prev_simulation_time = self.globals.time;
