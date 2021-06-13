@@ -2,3 +2,4 @@ target/
 *.renderdoc.cap
 __pycache__/
 *.py[cod]
+build/
