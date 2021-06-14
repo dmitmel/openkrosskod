@@ -13,6 +13,7 @@ pub mod renderer;
 pub mod game_of_life;
 pub mod image_decoding_speedrun;
 pub mod mandelbrot;
+pub mod marching_squares;
 pub mod pong;
 
 use prelude_plus::*;
@@ -34,6 +35,8 @@ use crate::pong::Pong;
 use crate::game_of_life::GameOfLife;
 #[cfg(feature = "mandelbrot")]
 use crate::mandelbrot::Mandelbrot;
+#[cfg(feature = "marching_squares")]
+use crate::marching_squares::MarchingSquares;
 
 const GAME_NAME: &str = "openKrossKod";
 // const GAME_NAME: &str = env!("CARGO_PKG_NAME");
@@ -158,6 +161,9 @@ fn try_main() -> AnyResult<()> {
     GameOfLife::init(globals.share()).context("Failed to initialize GameOfLife")?;
   #[cfg(feature = "mandelbrot")]
   let mandelbrot = Mandelbrot::init(globals.share()).context("Failed to initialize Mandelbrot")?;
+  #[cfg(feature = "marching_squares")]
+  let marching_squares =
+    MarchingSquares::init(globals.share()).context("Failed to initialize MarchingSquares")?;
 
   globals.gl.release_shader_compiler();
 
@@ -176,6 +182,8 @@ fn try_main() -> AnyResult<()> {
     game_of_life,
     #[cfg(feature = "mandelbrot")]
     mandelbrot,
+    #[cfg(feature = "marching_squares")]
+    marching_squares,
   };
 
   info!("Core subsystems have been initialized, starting the game loop...");
@@ -200,6 +208,8 @@ struct Game {
   pub game_of_life: GameOfLife,
   #[cfg(feature = "mandelbrot")]
   pub mandelbrot: Mandelbrot,
+  #[cfg(feature = "marching_squares")]
+  pub marching_squares: MarchingSquares,
 }
 
 impl Game {
@@ -387,6 +397,9 @@ impl Game {
     #[cfg(feature = "mandelbrot")]
     self.mandelbrot.update();
 
+    #[cfg(feature = "marching_squares")]
+    self.marching_squares.update();
+
     Ok(())
   }
 
@@ -417,6 +430,14 @@ impl Game {
       self.mandelbrot.render();
       self.renderer.prepare();
       self.mandelbrot.render_debug_info(&mut self.renderer, &mut self.pong.font);
+      self.renderer.finish();
+    }
+
+    #[cfg(feature = "marching_squares")]
+    {
+      self.marching_squares.render();
+      self.renderer.prepare();
+      self.marching_squares.render_debug_info(&mut self.renderer, &mut self.pong.font);
       self.renderer.finish();
     }
 

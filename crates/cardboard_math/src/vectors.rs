@@ -159,6 +159,21 @@ macro_rules! impl_vec_n {
       }
     }
 
+    impl<T> Index<usize> for $VecTy<T> {
+      type Output = T;
+      #[inline(always)]
+      fn index(&self, i: usize) -> &T {
+        let v: &[T; $fields] = self.as_ref(); &v[i]
+      }
+    }
+
+    impl<T> IndexMut<usize> for $VecTy<T> {
+      #[inline(always)]
+      fn index_mut(&mut self, i: usize) -> &mut T {
+        let v: &mut [T; $fields] = self.as_mut(); &mut v[i]
+      }
+    }
+
     impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, u8);
     impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, i8, signed);
     impl_vec_n_for_t!($fields, $VecTy { $($field),+ }, u16);
@@ -234,6 +249,11 @@ macro_rules! impl_vec_n_for_t {
       pub fn sqr_distance(self, rhs: Self) -> $NumTy { (rhs - self).sqr_magnitude() }
       #[inline]
       pub fn dot(self, rhs: Self) -> $NumTy { skip_first_tt!($(+ self.$field * rhs.$field)+) }
+
+      #[inline]
+      pub fn min_component(self) -> $NumTy { $NumTy::MAX $(.min(self.$field))+ }
+      #[inline]
+      pub fn max_component(self) -> $NumTy { $NumTy::MIN $(.max(self.$field))+ }
 
       #[inline]
       pub fn min_components(self, rhs: Self) -> Self {
