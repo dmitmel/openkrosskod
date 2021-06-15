@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 
-import os
 import sys
+
+# <https://github.com/python/cpython/blob/v3.9.5/Modules/main.c#L195>
+# <https://github.com/python/cpython/blob/v3.9.5/Python/sysmodule.c#L2694-L2695>
+# <https://github.com/python/cpython/blob/v3.9.5/Python/sysmodule.c#L2706-L2707>
+print(f"Python {sys.version} on {sys.platform}")
+
+import os
 from distutils.util import get_platform
 
 # WHY THE HELL IS THIS EVEN REQUIRED????
