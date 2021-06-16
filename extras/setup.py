@@ -4,6 +4,6 @@ setup(
   name="openkrosskod_extras",
   version="0.0.0",
   ext_modules=[
-    Extension("mega_tournament_ultra_fast", sources=["mega_tournament_ultra_fast.cpp"]),
+    Extension("mega_tournament_ultra_fast", sources=["mega_tournament_ultra_fast.cpp"], extra_compile_args=["-std=c++11"]),
   ]
 )
