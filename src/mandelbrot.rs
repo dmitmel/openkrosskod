@@ -1,5 +1,6 @@
 // <https://en.wikipedia.org/wiki/Mandelbrot_set>
 // <https://en.wikipedia.org/wiki/Plotting_algorithms_for_the_Mandelbrot_set>
+// <https://en.wikipedia.org/wiki/Julia_set>
 
 use cardboard_math::*;
 use cardboard_oogl as oogl;
@@ -29,6 +30,8 @@ pub struct Mandelbrot {
   program_reflection: ProgramReflection,
   camera_pos: Vec2f,
   camera_zoom: f32,
+  is_julia_mode: bool,
+  starting_point: Vec2f,
 }
 
 impl Mandelbrot {
@@ -71,6 +74,8 @@ impl Mandelbrot {
       program_reflection,
       camera_pos: Vec2f::ZERO,
       camera_zoom: 0.0,
+      is_julia_mode: false,
+      starting_point: Vec2f::ZERO,
     };
     myself.reset_view();
     Ok(myself)
@@ -98,6 +103,16 @@ impl Mandelbrot {
 
     if self.globals.input_state.is_key_pressed(Key::R) {
       self.reset_view();
+      self.starting_point = Vec2f::ZERO;
+    }
+
+    if self.globals.input_state.is_key_pressed(Key::J) {
+      self.is_julia_mode = !self.is_julia_mode;
+    }
+
+    if self.globals.input_state.is_key_down(Key::MouseRight) {
+      self.starting_point =
+        self.globals.input_state.mouse_pos / self.camera_zoom + self.camera_pos;
     }
   }
 
@@ -109,6 +124,8 @@ impl Mandelbrot {
     if self.globals.window_was_resized {
       reflection.u_window_size.set(&bound_program, &self.globals.window_size);
     }
+    reflection.u_julia_mode.set(&bound_program, &self.is_julia_mode);
+    reflection.u_starting_point.set(&bound_program, &self.starting_point);
 
     let bound_vertex_buf = self.vertex_buf.bind();
     bound_vertex_buf.enable_attribs();
@@ -123,8 +140,9 @@ impl Mandelbrot {
   ) {
     let mut text_block_offset = Vec2f::ZERO;
     for &text in &[
-      format!("  pos: {:?} {:?}", self.camera_pos.x, self.camera_pos.y).as_str(),
-      format!(" zoom: {:.06e}", self.camera_zoom).as_str(),
+      format!("   pos: {:?} {:?}", self.camera_pos.x, self.camera_pos.y).as_str(),
+      format!("  zoom: {:.06e}", self.camera_zoom).as_str(),
+      format!(" start: {:?} {:?}", self.starting_point.x, self.starting_point.y).as_str(),
     ] {
       let text_block = &mut renderer::TextBlock {
         text,
@@ -151,5 +169,7 @@ oogl::program_reflection_block!({
     u_camera_pos: oogl::Uniform<Vec2f>,
     u_camera_zoom: oogl::Uniform<f32>,
     u_unit_size: oogl::Uniform<Vec2f>,
+    u_julia_mode: oogl::Uniform<bool>,
+    u_starting_point: oogl::Uniform<Vec2f>,
   }
 });

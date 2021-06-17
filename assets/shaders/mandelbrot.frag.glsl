@@ -8,6 +8,9 @@ varying vec2 v_pos;
 
 uniform int u_max_iterations;
 uniform float u_escape_radius;
+uniform bool u_julia_mode;
+uniform vec2 u_starting_point;
+uniform vec2 u_unit_size;
 
 vec2 iterate(vec2 z, vec2 c) {
   return vec2(
@@ -28,8 +31,9 @@ float map(float value, float src_min, float src_max, float dest_min, float dest_
 }
 
 void main() {
-  vec2 z = vec2(0.0);
-  vec2 c = v_pos;
+  vec2 start = u_starting_point / u_unit_size;
+  vec2 z = u_julia_mode ? v_pos : vec2(0.0);
+  vec2 c = u_julia_mode ? start : v_pos;
 
   int i = 0;
   float er = u_escape_radius;
