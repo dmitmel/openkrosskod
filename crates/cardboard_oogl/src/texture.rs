@@ -277,9 +277,15 @@ impl<'obj, T: TextureDataType> Texture2DBinding<'obj, T> {
   }
 }
 
+pub const TEXTURE_INPUT_DATA_ROW_ALIGN: usize = 4;
+
 #[track_caller]
 pub(crate) fn check_texture_data_len(data_len: usize, size: Vec2u32, format: TextureInputFormat) {
-  let expected_data_len = size.x as usize * size.y as usize * format.color_components() as usize;
+  // <https://stackoverflow.com/a/60266711/12005228>
+  let row_unpadded_len = size.x as usize * format.color_components() as usize;
+  let row_len = crate::pad_to_alignment(row_unpadded_len, TEXTURE_INPUT_DATA_ROW_ALIGN);
+
+  let expected_data_len = row_len * size.y as usize;
   if data_len != expected_data_len {
     #[inline(never)]
     #[cold]
@@ -293,13 +299,14 @@ pub(crate) fn check_texture_data_len(data_len: usize, size: Vec2u32, format: Tex
       panic!(
         "texture data length mismatch: the length of the provided data slice is {}, but the \
         required length for an image of size {}x{} and with input format `{:?}` ({} color \
-        components) is {}",
+        components) is {} (the difference is {})",
         data_len,
         size.x,
         size.y,
         format,
         format.color_components(),
         expected_data_len,
+        data_len as isize - expected_data_len as isize,
       );
     }
     texture_data_len_mismatch_fail(expected_data_len, data_len, size, format);

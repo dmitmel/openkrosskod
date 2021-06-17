@@ -4,20 +4,29 @@
 precision highp float;
 #endif
 
-varying vec2 v_pos;
+// #define SHADER_IMPL
 
-uniform int u_max_iterations;
-uniform float u_escape_radius;
-uniform bool u_julia_mode;
-uniform vec2 u_starting_point;
-uniform vec2 u_unit_size;
+varying vec2 v_screen_pos;
+varying vec2 v_world_pos;
 
-vec2 iterate(vec2 z, vec2 c) {
-  return vec2(
-    z.x*z.x - z.y*z.y + c.x,
-    2.0 * z.x * z.y   + c.y
-  );
-}
+#ifdef SHADER_IMPL
+  uniform int u_max_iterations;
+  uniform float u_escape_radius;
+  uniform bool u_julia_mode;
+  uniform vec2 u_starting_point;
+  uniform vec2 u_unit_size;
+#else
+  uniform sampler2D u_tex;
+#endif
+
+#ifdef SHADER_IMPL
+  vec2 iterate(vec2 z, vec2 c) {
+    return vec2(
+      z.x*z.x - z.y*z.y + c.x,
+      2.0 * z.x * z.y   + c.y
+    );
+  }
+#endif
 
 // <https://github.com/hughsk/glsl-hsv2rgb/blob/1b1112c03408c19c0c64017f433d19f1f11049ba/index.glsl>
 vec3 hsv2rgb(vec3 c) {
@@ -31,29 +40,44 @@ float map(float value, float src_min, float src_max, float dest_min, float dest_
 }
 
 void main() {
-  vec2 start = u_starting_point / u_unit_size;
-  vec2 z = u_julia_mode ? v_pos : vec2(0.0);
-  vec2 c = u_julia_mode ? start : v_pos;
+  float result = 1.0;
 
-  int i = 0;
-  float er = u_escape_radius;
-  while (i < u_max_iterations && dot(z, z) <= er * er) {
+#ifdef SHADER_IMPL
+
+  vec2 start = u_starting_point / u_unit_size;
+  vec2 z = u_julia_mode ? v_world_pos : vec2(0.0);
+  vec2 c = u_julia_mode ? start : v_world_pos;
+
+  int iter = 0;
+  float esc_r = u_escape_radius;
+  while (iter < u_max_iterations && dot(z, z) <= esc_r * esc_r) {
     z = iterate(z, c);
-    i++;
+    iter++;
   }
+
+  if (iter < u_max_iterations) {
+    // <https://en.wikipedia.org/wiki/Plotting_algorithms_for_the_Mandelbrot_set#Continuous_(smooth)_coloring>
+    float nu = log2(log2(dot(z, z)) / 2.0); // == log2(log2(length(z)))
+    float smooth_iter = float(iter) + 1.0 - nu;
+
+    result = smooth_iter / float(u_max_iterations);
+  } else {
+    result = 1.0;
+  }
+
+#else
+
+  result = texture2D(u_tex, v_screen_pos / 2.0 + 0.5).r;
+
+#endif
 
   vec3 rgb_color = vec3(0.0);
 
-  if (i < u_max_iterations) {
-    // <https://en.wikipedia.org/wiki/Plotting_algorithms_for_the_Mandelbrot_set#Continuous_(smooth)_coloring>
-    float nu = log2(log2(dot(z, z)) / 2.0); // == log2(log2(length(z)))
-    float smooth_i = float(i) + 1.0 - nu;
-
-    float x = smooth_i / float(u_max_iterations);
+  if (result < 1.0) {
     vec3 hsv_color = vec3(
-      map(x, 0.0, 1.0, 2.0/3.0, 0.0),
+      map(result, 0.0, 1.0, 2.0/3.0, 0.0),
       1.0,
-      map(x, 0.0, 1.0, 0.2, 2.0)
+      map(result, 0.0, 1.0, 0.2, 2.0)
     );
     rgb_color = hsv2rgb(hsv_color);
   }

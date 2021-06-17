@@ -71,3 +71,14 @@ pub use framebuffer::*;
 pub use shader::*;
 pub use texture::*;
 pub use traits::*;
+
+#[inline(always)]
+pub fn padding_for_alignment(unpadded_len: usize, alignment: usize) -> usize {
+  // <https://stackoverflow.com/q/20844983/12005228>
+  (alignment - unpadded_len % alignment) % alignment
+}
+
+#[inline(always)]
+pub fn pad_to_alignment(unpadded_len: usize, alignment: usize) -> usize {
+  unpadded_len + padding_for_alignment(unpadded_len, alignment)
+}

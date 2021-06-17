@@ -285,9 +285,17 @@ macro_rules! impl_vec_n_for_t {
     impl_vec_n_operator!(binary_assign, $VecTy<$NumTy>, DivAssign, fn div_assign(a, b) { $(a.$field /= b.$field);+ });
     impl_vec_n_operator!(binary_assign, $VecTy<$NumTy>, RemAssign, fn rem_assign(a, b) { $(a.$field %= b.$field);+ });
 
+    impl_vec_n_operator!(binary_scalar, $VecTy<$NumTy>, Add, fn add(v, s) { $VecTy { $($field: v.$field + s),+ } });
+    impl_vec_n_operator!(binary_scalar, $VecTy<$NumTy>, Sub, fn sub(v, s) { $VecTy { $($field: v.$field - s),+ } });
     impl_vec_n_operator!(binary_scalar, $VecTy<$NumTy>, Mul, fn mul(v, s) { $VecTy { $($field: v.$field * s),+ } });
     impl_vec_n_operator!(binary_scalar, $VecTy<$NumTy>, Div, fn div(v, s) { $VecTy { $($field: v.$field / s),+ } });
     impl_vec_n_operator!(binary_scalar, $VecTy<$NumTy>, Rem, fn rem(v, s) { $VecTy { $($field: v.$field % s),+ } });
+
+    impl_vec_n_operator!(binary_scalar_rev, $VecTy<$NumTy>, Add, fn add(s, v) { $VecTy { $($field: s + v.$field),+ } });
+    impl_vec_n_operator!(binary_scalar_rev, $VecTy<$NumTy>, Sub, fn sub(s, v) { $VecTy { $($field: s - v.$field),+ } });
+    impl_vec_n_operator!(binary_scalar_rev, $VecTy<$NumTy>, Mul, fn mul(s, v) { $VecTy { $($field: s * v.$field),+ } });
+    impl_vec_n_operator!(binary_scalar_rev, $VecTy<$NumTy>, Div, fn div(s, v) { $VecTy { $($field: s / v.$field),+ } });
+    impl_vec_n_operator!(binary_scalar_rev, $VecTy<$NumTy>, Rem, fn rem(s, v) { $VecTy { $($field: s % v.$field),+ } });
 
     impl_vec_n_operator!(binary_scalar_assign, $VecTy<$NumTy>, MulAssign, fn mul_assign(v, s) { $(v.$field *= s);+ });
     impl_vec_n_operator!(binary_scalar_assign, $VecTy<$NumTy>, DivAssign, fn div_assign(v, s) { $(v.$field /= s);+ });
@@ -387,11 +395,14 @@ macro_rules! impl_vec_n_operator {
         $op_fn_body
       }
     }
+  };
+
+  (binary_scalar_rev, $VecTy:ident<$NumTy:ident>, $op:ident, fn $op_fn:ident($lhs:ident, $rhs:ident) $op_fn_body:block) => {
     impl $op<$VecTy<$NumTy>> for $NumTy {
       type Output = $VecTy<$NumTy>;
       #[inline]
       fn $op_fn(self, other: $VecTy<$NumTy>) -> Self::Output {
-        let ($lhs, $rhs) = (other, self);
+        let ($lhs, $rhs) = (self, other);
         $op_fn_body
       }
     }
