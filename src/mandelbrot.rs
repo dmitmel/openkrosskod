@@ -11,7 +11,7 @@ use crate::globals::SharedGlobals;
 use crate::input::Key;
 use crate::renderer;
 
-const CAMERA_ZOOM_SPEED: f64 = 0.04;
+const CAMERA_ZOOM_SPEED: f64 = 2.4;
 const CAMERA_UPDATE_COOLDOWN: f64 = 1.0;
 const MAX_PIXELATION_LEVEL: u32 = 4;
 const UNIT_SIZE: Vec2f64 = vec2n(200.0);
@@ -144,7 +144,7 @@ impl Mandelbrot {
 
     let zoom_axis = self.globals.input_state.axis(Key::Minus, Key::Equals);
     if zoom_axis != 0 {
-      let zoom_factor = 1.0 + zoom_axis as f64 * CAMERA_ZOOM_SPEED;
+      let zoom_factor = 1.0 + zoom_axis as f64 * self.globals.delta_time * CAMERA_ZOOM_SPEED;
       self.camera_zoom *= zoom_factor;
       // <https://stackoverflow.com/a/2919434/12005228>
       self.camera_pos -=
