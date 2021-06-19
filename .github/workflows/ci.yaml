@@ -17,7 +17,9 @@ jobs:
         with:
           components: rustfmt, clippy
       - name: Install SDL2
-        run: sudo apt-get install libsdl2-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install libsdl2-dev
 
       - uses: actions/cache@v2
         with:
