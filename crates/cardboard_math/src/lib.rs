@@ -1,4 +1,4 @@
-#![cfg_attr(feature = "const_fn", feature(const_fn))]
+#![cfg_attr(feature = "const_fn", feature(const_fn_trait_bound))]
 #![deny(missing_debug_implementations)]
 
 pub mod colors;

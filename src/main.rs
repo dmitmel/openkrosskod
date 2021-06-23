@@ -1,6 +1,6 @@
 #![deny(missing_debug_implementations)]
 #![allow(clippy::new_without_default, clippy::missing_safety_doc)]
-#![feature(test, get_mut_unchecked)]
+#![feature(bench_black_box, get_mut_unchecked)]
 
 pub mod gen_idx; // TODO
 
