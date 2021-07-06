@@ -144,11 +144,16 @@ impl Mandelbrot {
 
     let zoom_axis = self.globals.input_state.axis(Key::Minus, Key::Equals);
     if zoom_axis != 0 {
-      let zoom_factor = 1.0 + zoom_axis as f64 * self.globals.delta_time * CAMERA_ZOOM_SPEED;
-      self.camera_zoom *= zoom_factor;
+      let zoom_factor = 1.0 + zoom_axis.abs() as f64 * self.globals.delta_time * CAMERA_ZOOM_SPEED;
+      let mut new_camera_zoom = self.camera_zoom;
+      if zoom_axis > 0 {
+        new_camera_zoom *= zoom_factor;
+      } else if zoom_axis < 0 {
+        new_camera_zoom /= zoom_factor;
+      }
       // <https://stackoverflow.com/a/2919434/12005228>
-      self.camera_pos -=
-        mouse_pos / (self.camera_zoom * zoom_factor) - mouse_pos / self.camera_zoom;
+      self.camera_pos -= mouse_pos / new_camera_zoom - mouse_pos / self.camera_zoom;
+      self.camera_zoom = new_camera_zoom;
       self.mark_dirty();
     }
 
