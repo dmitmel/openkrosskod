@@ -369,5 +369,5 @@ fn copy_data_from_vec_into_buffer<'obj, Obj: 'obj, T>(
   } else {
     buffer.orphan_data();
   }
-  buffer.set_slice(0..data_vec.len(), &data_vec);
+  buffer.set_slice(0..data_vec.len(), data_vec);
 }

@@ -196,8 +196,11 @@ fn try_main() -> AnyResult<()> {
 struct Game {
   pub globals: SharedGlobals,
 
+  #[allow(dead_code)]
   pub sdl_context: sdl2::Sdl,
+  #[allow(dead_code)]
   pub video_subsystem: sdl2::VideoSubsystem,
+  #[allow(dead_code)]
   pub sdl_gl_ctx: sdl2::video::GLContext,
   pub window: Window,
   pub event_pump: EventPump,

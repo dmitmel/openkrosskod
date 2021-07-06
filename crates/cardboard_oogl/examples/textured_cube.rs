@@ -70,7 +70,7 @@ fn main() {
     .set(&bound_program, &Mat4f::look_to_rh(CAMERA_POS, Vec3f::ZERO - CAMERA_POS, Vec3f::UP));
 
   let reset_viewport = |gl: &Context, window: &Window| {
-    common::reset_gl_viewport(&gl, &window);
+    common::reset_gl_viewport(gl, window);
     let (w, h) = window.drawable_size();
     let aspect = w as f32 / h as f32;
     uni_proj_mat.set(

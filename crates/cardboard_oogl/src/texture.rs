@@ -122,7 +122,7 @@ where
   T: TextureDataType,
 {
   #[inline(always)]
-  fn object(&self) -> &Texture2D<T> { &self.texture }
+  fn object(&self) -> &Texture2D<T> { self.texture }
 
   fn unbind_completely(self) { self.ctx().bound_texture_2d.unbind_unconditionally(self.raw_gl()); }
 }

@@ -6,7 +6,7 @@ use prelude_plus::*;
 pub type SharedContext = Rc<Context>;
 impl Context {
   #[inline(always)]
-  pub fn share(self: &SharedContext) -> SharedContext { Rc::clone(&self) }
+  pub fn share(self: &SharedContext) -> SharedContext { Rc::clone(self) }
 }
 
 pub struct Context {

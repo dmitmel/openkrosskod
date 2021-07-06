@@ -55,7 +55,7 @@ pub struct FramebufferBinding<'obj> {
 
 unsafe impl<'obj> ObjectBinding<'obj, Framebuffer> for FramebufferBinding<'obj> {
   #[inline(always)]
-  fn object(&self) -> &Framebuffer { &self.framebuffer }
+  fn object(&self) -> &Framebuffer { self.framebuffer }
 
   fn unbind_completely(self) {
     self.ctx().bound_framebuffer.unbind_unconditionally(self.raw_gl());

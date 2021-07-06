@@ -342,7 +342,7 @@ impl Program {
     }
 
     let (location, data_type) =
-      check_uniform_type(&self, name, T::CORRESPONDING_UNIFORM_TYPES, type_name::<T>());
+      check_uniform_type(self, name, T::CORRESPONDING_UNIFORM_TYPES, type_name::<T>());
     Uniform { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
 
@@ -376,7 +376,7 @@ impl Program {
     }
 
     let (location, data_type) =
-      check_attrib_type(&self, name, T::CORRESPONDING_ATTRIB_TYPES, std::any::type_name::<T>());
+      check_attrib_type(self, name, T::CORRESPONDING_ATTRIB_TYPES, std::any::type_name::<T>());
     Attrib { location, program_addr: self.addr, data_type, phantom: PhantomData }
   }
 
@@ -396,7 +396,7 @@ pub struct ProgramBinding<'obj> {
 
 unsafe impl<'obj> ObjectBinding<'obj, Program> for ProgramBinding<'obj> {
   #[inline(always)]
-  fn object(&self) -> &Program { &self.program }
+  fn object(&self) -> &Program { self.program }
 
   fn unbind_completely(self) { self.ctx().bound_program.unbind_unconditionally(self.raw_gl()); }
 }

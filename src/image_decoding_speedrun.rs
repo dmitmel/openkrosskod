@@ -183,9 +183,14 @@ pub fn multi_threaded_main() -> AssetsMap {
   }
 
   let jobs_count = num_cpus::get();
-  let jobs: Vec<_> = (0..jobs_count)
-    .map(|i| asset_loading_job(i, Arc::clone(&assets), Arc::clone(&decoding_requests_recv_locked)))
-    .collect();
+  let mut jobs = Vec::<thread::JoinHandle<()>>::with_capacity(jobs_count);
+  for i in 0..jobs_count {
+    jobs.push(asset_loading_job(
+      i,
+      Arc::clone(&assets),
+      Arc::clone(&decoding_requests_recv_locked),
+    ))
+  }
 
   for path in asset_paths {
     decoding_requests_send.send(path).expect("decoding requests channel has been broken");

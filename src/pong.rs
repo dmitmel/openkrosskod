@@ -221,7 +221,7 @@ impl Pong {
       (&mut *left_racket, &mut *left_racket_controller),
       (&mut *right_racket, &mut *right_racket_controller),
     ] {
-      let dir = controller.get_movement_direction(&self.globals, &racket, &ball);
+      let dir = controller.get_movement_direction(&self.globals, racket, ball);
       racket.coll.accel.y = dir * RACKET_MAX_SPEED * RACKET_ACCELERATION;
     }
 

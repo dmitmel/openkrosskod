@@ -98,7 +98,7 @@ where
   T: Copy,
 {
   #[inline(always)]
-  fn object(&self) -> &VertexBuffer<T> { &self.buffer }
+  fn object(&self) -> &VertexBuffer<T> { self.buffer }
 
   fn unbind_completely(self) {
     self.ctx().bound_vertex_buffer.unbind_unconditionally(self.raw_gl());
@@ -206,7 +206,7 @@ where
   T: BufferIndex,
 {
   #[inline(always)]
-  fn object(&self) -> &ElementBuffer<T> { &self.buffer }
+  fn object(&self) -> &ElementBuffer<T> { self.buffer }
 
   fn unbind_completely(self) {
     self.ctx().bound_element_buffer.unbind_unconditionally(self.raw_gl());
