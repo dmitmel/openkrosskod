@@ -16,7 +16,8 @@ const CAMERA_UPDATE_COOLDOWN: f64 = 1.0;
 const MAX_PIXELATION_LEVEL: u32 = 4;
 const UNIT_SIZE: Vec2f64 = vec2n(200.0);
 const ESCAPE_RADIUS: f64 = 2.0;
-const MAX_ITERATIONS: u32 = 300;
+const MAX_ITERATIONS: u32 = 400;
+const DEEP_DIVE_COEFF: f64 = 10.0;
 
 #[rustfmt::skip]
 fn iterate(z: Vec2f64, c: Vec2f64) -> Vec2f64 {
@@ -74,6 +75,7 @@ impl Mandelbrot {
       let reflection = &program_reflection;
       reflection.u_max_iterations.set(&bound_program, &MAX_ITERATIONS);
       reflection.u_escape_radius.set(&bound_program, &(ESCAPE_RADIUS as f32));
+      reflection.u_deep_dive_coeff.set(&bound_program, &(DEEP_DIVE_COEFF as f32));
       reflection.u_unit_size.set(&bound_program, &Vec2f::cast_from(UNIT_SIZE));
     }
 
@@ -249,6 +251,7 @@ impl Mandelbrot {
             let mut z = if is_julia_mode { world_pos } else { vec2n(0.0) };
             let c = if is_julia_mode { starting_point } else { world_pos };
 
+            // <https://en.wikipedia.org/wiki/Plotting_algorithms_for_the_Mandelbrot_set#Periodicity_checking>
             let mut iter = 0;
             let esc_r = ESCAPE_RADIUS as f64;
             while iter < MAX_ITERATIONS && z.sqr_magnitude() <= esc_r * esc_r {
@@ -256,13 +259,17 @@ impl Mandelbrot {
               iter += 1;
             }
 
-            let result = if iter < MAX_ITERATIONS {
+            let mut result = 1.0;
+            if iter < MAX_ITERATIONS {
               // <https://en.wikipedia.org/wiki/Plotting_algorithms_for_the_Mandelbrot_set#Continuous_(smooth)_coloring>
-              let nu = z.sqr_magnitude().log2().log2() / 2.0; // == z.magnitude().log2().log2()
+              let nu = (z.sqr_magnitude().log2() / 2.0).log2(); // == z.magnitude().log2().log2()
               let smooth_iter = iter as f64 + 1.0 - nu;
-              smooth_iter / MAX_ITERATIONS as f64
-            } else {
-              1.0
+              result = smooth_iter / MAX_ITERATIONS as f64;
+              if DEEP_DIVE_COEFF != 0.0 {
+                // <https://www.math.univ-toulouse.fr/~cheritat/wiki-draw/index.php/Mandelbrot_set#Deep_zooms_and_log-potential_scale>
+                // <https://github.com/HackerPoet/FractalSoundExplorer/blob/8855063aa1c8b8ac0a0d61be13ceb85b553698d0/frag.glsl#L122-L124>
+                result = (result * f64::consts::PI * DEEP_DIVE_COEFF).cos() * -0.5 + 0.5
+              }
             };
 
             let out = unsafe { Arc::get_mut_unchecked(&mut texture_data) };
@@ -333,6 +340,7 @@ oogl::program_reflection_block!({
     a_pos: oogl::Attrib<Vec2f>,
     u_max_iterations: oogl::Uniform<u32>,
     u_escape_radius: oogl::Uniform<f32>,
+    u_deep_dive_coeff: oogl::Uniform<f32>,
     u_window_size: oogl::Uniform<Vec2f>,
     u_camera_pos: oogl::Uniform<Vec2f>,
     u_camera_zoom: oogl::Uniform<f32>,

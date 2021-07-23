@@ -12,6 +12,7 @@ varying vec2 v_world_pos;
 #ifdef SHADER_IMPL
   uniform int u_max_iterations;
   uniform float u_escape_radius;
+  uniform float u_deep_dive_coeff;
   uniform bool u_julia_mode;
   uniform vec2 u_starting_point;
   uniform vec2 u_unit_size;
@@ -28,6 +29,9 @@ varying vec2 v_world_pos;
   }
 #endif
 
+// <https://gist.github.com/patriciogonzalezvivo/986341af1560138dde52/ede2758404dff48bf4db432f47ca8bd22e5c7924#trigonometry>
+const float PI = 3.1415926535897932384626433832795;
+
 // <https://github.com/hughsk/glsl-hsv2rgb/blob/1b1112c03408c19c0c64017f433d19f1f11049ba/index.glsl>
 vec3 hsv2rgb(vec3 c) {
   vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
@@ -40,7 +44,6 @@ float map(float value, float src_min, float src_max, float dest_min, float dest_
 }
 
 void main() {
-  float result = 1.0;
 
 #ifdef SHADER_IMPL
 
@@ -55,19 +58,21 @@ void main() {
     iter++;
   }
 
+  float result = 1.0;
   if (iter < u_max_iterations) {
     // <https://en.wikipedia.org/wiki/Plotting_algorithms_for_the_Mandelbrot_set#Continuous_(smooth)_coloring>
     float nu = log2(log2(dot(z, z)) / 2.0); // == log2(log2(length(z)))
     float smooth_iter = float(iter) + 1.0 - nu;
 
     result = smooth_iter / float(u_max_iterations);
-  } else {
-    result = 1.0;
+    if (u_deep_dive_coeff != 0.0) {
+      result = cos(result * PI * u_deep_dive_coeff) * -0.5 + 0.5;
+    }
   }
 
 #else
 
-  result = texture2D(u_tex, v_screen_pos / 2.0 + 0.5).r;
+  float result = texture2D(u_tex, v_screen_pos / 2.0 + 0.5).r;
 
 #endif
 
