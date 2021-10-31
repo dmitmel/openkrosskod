@@ -53,12 +53,6 @@ pub struct Mandelbrot {
   workers: threadpool::ThreadPool,
 }
 
-#[derive(Debug)]
-struct WorkerChunk {
-  pos: Vec2u32,
-  size: Vec2u32,
-}
-
 impl Mandelbrot {
   pub fn init(globals: SharedGlobals) -> AnyResult<Self> {
     use oogl::ShaderType as ShTy;
@@ -148,6 +142,7 @@ impl Mandelbrot {
     if zoom_axis != 0 {
       let zoom_factor = 1.0 + zoom_axis.abs() as f64 * self.globals.delta_time * CAMERA_ZOOM_SPEED;
       let mut new_camera_zoom = self.camera_zoom;
+      #[allow(clippy::comparison_chain)]
       if zoom_axis > 0 {
         new_camera_zoom *= zoom_factor;
       } else if zoom_axis < 0 {
@@ -217,7 +212,10 @@ impl Mandelbrot {
         bound_tex.set_size(tex_size);
         bound_tex.alloc(0);
         let mut data = Vec::<u8>::with_capacity(tex_data_len);
-        unsafe { data.set_len(tex_data_len) };
+        #[allow(clippy::uninit_vec)]
+        unsafe {
+          data.set_len(tex_data_len);
+        }
         self.texture_data = Arc::new(data);
       } else {
         // Orphan the data? Apparently not needed.

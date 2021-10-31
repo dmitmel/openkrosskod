@@ -92,11 +92,10 @@ pub(crate) unsafe fn set_object_debug_label(ctx: &Context, type_id: u32, addr: u
     // arises - either use the crate `memchr` or the unstable feature
     // `slice_internals`.
     // By the way, the behavior of ignoring characters past the NUL byte in the
-    // debug label is undocumented as far as I know.
-    if label.contains(&0) {
-      // error message was copied from `Error` impl of `FromBytesWithNulError`
-      panic!("data provided contains an interior nul byte");
-    }
+    // debug label (even though length is provided explicitly) is undocumented
+    // as far as I know.
+    // Error message was copied from `Error` impl of `FromBytesWithNulError`.
+    assert!(!label.contains(&0), "data provided contains an interior nul byte");
 
     gl.ObjectLabel(type_id, addr, label_len, label.as_ptr() as *const c_char);
   }
