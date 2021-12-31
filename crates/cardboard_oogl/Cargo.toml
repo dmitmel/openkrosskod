@@ -11,9 +11,9 @@ cardboard_math = { path = "../cardboard_math" }
 prelude-plus = { path = "../prelude-plus", features = ["log", "bitflags"] }
 
 [dev-dependencies]
-png = { version = "0.16.7", default-features = false }
-jpeg-decoder = { version = "0.1.20", default-features = false }
-sdl2 = "0.34.3"
+png = "0.17.2"
+jpeg-decoder = { version = "0.2.1", default-features = false }
+sdl2 = "0.35.1"
 
 [features]
 debug_all_commands = ["gl/debug_all_commands"]

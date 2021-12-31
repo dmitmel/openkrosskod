@@ -454,6 +454,7 @@ gl_enum!({
 });
 
 impl FrontFaceWinding {
+  #[must_use]
   pub fn opposite(self) -> Self {
     use FrontFaceWinding::*;
     match self {

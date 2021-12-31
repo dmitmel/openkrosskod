@@ -363,9 +363,10 @@ pub fn load_texture_data_from_png(
   reader: impl Read,
 ) -> Result<oogl::Texture2D, png::DecodingError> {
   let decoder = png::Decoder::new(reader);
-  let (info, mut reader) = decoder.read_info()?;
-  let mut buf = vec![0; info.buffer_size()];
-  reader.next_frame(&mut buf)?;
+  let mut reader = decoder.read_info()?;
+  let mut buf = vec![0; reader.output_buffer_size()];
+  let info = reader.next_frame(&mut buf)?;
+  let pixels = &buf[0..info.buffer_size()];
 
   use png::{BitDepth, ColorType};
 
@@ -377,9 +378,9 @@ pub fn load_texture_data_from_png(
   use oogl::TextureInputFormat as GlFormat;
   let gl_format = match info.color_type {
     ColorType::Grayscale => GlFormat::Luminance,
-    ColorType::RGB => GlFormat::RGB,
+    ColorType::Rgb => GlFormat::RGB,
     ColorType::GrayscaleAlpha => GlFormat::LuminanceAlpha,
-    ColorType::RGBA => GlFormat::RGBA,
+    ColorType::Rgba => GlFormat::RGBA,
     _ => unimplemented!("Unsupported texture color type: {:?}", info.color_type),
   };
 
@@ -389,7 +390,7 @@ pub fn load_texture_data_from_png(
   {
     let bound_texture = texture.bind(texture_unit);
     bound_texture.set_size(vec2(info.width, info.height));
-    bound_texture.alloc_and_set(0, &buf);
+    bound_texture.alloc_and_set(0, pixels);
   }
 
   Ok(texture)

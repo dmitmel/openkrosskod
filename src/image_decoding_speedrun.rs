@@ -117,9 +117,10 @@ fn load_asset(path: &Path, file_type: AssetFileType) -> Asset {
 
   fn decode_png_image(buf_reader: BufReader<File>) -> Result<Asset, png::DecodingError> {
     let decoder = png::Decoder::new(buf_reader);
-    let (info, mut reader) = decoder.read_info().unwrap();
-    let mut buffer = vec![0; info.buffer_size()];
-    reader.next_frame(&mut buffer)?;
+    let mut reader = decoder.read_info().unwrap();
+    let mut buffer = vec![0; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buffer)?;
+    buffer.truncate(info.buffer_size());
     Ok(Asset::Image { buffer })
   }
 

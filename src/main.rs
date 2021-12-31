@@ -475,7 +475,7 @@ impl Game {
     let writer = BufWriter::new(file);
 
     let mut encoder = png::Encoder::new(writer, size.x, size.y);
-    encoder.set_color(png::ColorType::RGBA);
+    encoder.set_color(png::ColorType::Rgba);
     encoder.set_depth(png::BitDepth::Eight);
     let mut writer = encoder.write_header().context("Failed to write the PNG header")?;
     writer.write_image_data(&pixels).context("Failed to write the encoded PNG data")?;

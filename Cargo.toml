@@ -20,26 +20,26 @@ cardboard_math = { path = "crates/cardboard_math", features = ["serde", "const_f
 cardboard_oogl = { path = "crates/cardboard_oogl" }
 cardboard_utils = { path = "crates/cardboard_utils" }
 
-sdl2 = "0.34.3"
-png = { version = "0.16.7", default-features = false }
+sdl2 = "0.35.1"
+png = "0.17.2"
 
 serde = { version = "1.0.116", features = ["derive"] }
 # simd-json needs serde_json anyway, so the non-SIMD implementation is not maked
 # as an optional dependency (plus there's isn't really a "not" feature switch for
 # disabling specific dependencies)
 serde_json = "1.0.58"
-simd-json = { version = "0.3.21", optional = true }
+simd-json = { version = "0.4.13", optional = true }
 
 num_cpus = "1.13.0"
 threadpool = "1.8.1"
 
-env_logger = { version = "0.8.1", default-features = false, features = ["termcolor", "atty", "humantime"] }
+env_logger = { version = "0.9.0", default-features = false, features = ["termcolor", "atty", "humantime"] }
 
 [features]
 default = ["screenshot"]
 
 gl_debug_all_commands = ["cardboard_oogl/debug_all_commands"]
-screenshot = ["png/png-encoding"]
+screenshot = []
 
 # complex demos
 disable_pong = []

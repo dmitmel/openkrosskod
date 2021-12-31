@@ -142,18 +142,19 @@ fn load_png_texture_2d(
   encoded_data: &[u8],
 ) -> Texture2D {
   let decoder = png::Decoder::new(encoded_data);
-  let (info, mut reader) = decoder.read_info().unwrap();
-  let mut buf = vec![0; info.buffer_size()];
-  reader.next_frame(&mut buf).unwrap();
+  let mut reader = decoder.read_info().unwrap();
+  let mut buf = vec![0; reader.output_buffer_size()];
+  let info = reader.next_frame(&mut buf).unwrap();
+  let pixels = &buf[0..info.buffer_size()];
 
   assert!(info.bit_depth == png::BitDepth::Eight);
-  assert!(info.color_type == png::ColorType::RGBA);
+  assert!(info.color_type == png::ColorType::Rgba);
 
   let mut texture = Texture2D::new(gl, texture_unit_preference, TextureInputFormat::RGBA, None);
   {
     let bound_texture = texture.bind(None);
     bound_texture.set_size(vec2(info.width, info.height));
-    bound_texture.alloc_and_set(0, &buf);
+    bound_texture.alloc_and_set(0, pixels);
   }
 
   texture
