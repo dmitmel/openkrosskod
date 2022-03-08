@@ -1,4 +1,3 @@
-#![cfg_attr(feature = "const_fn", feature(const_fn_trait_bound))]
 #![deny(missing_debug_implementations)]
 #![allow(clippy::return_self_not_must_use)]
 

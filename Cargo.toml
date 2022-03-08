@@ -16,7 +16,7 @@ homepage = "https://github.com/dmitmel/openkrosskod"
 prelude-plus = { path = "crates/prelude-plus", features = ["log", "anyhow"] }
 
 cardboard_coal = { path = "crates/cardboard_coal" }
-cardboard_math = { path = "crates/cardboard_math", features = ["serde", "const_fn"] }
+cardboard_math = { path = "crates/cardboard_math", features = ["serde"] }
 cardboard_oogl = { path = "crates/cardboard_oogl" }
 cardboard_utils = { path = "crates/cardboard_utils" }
 

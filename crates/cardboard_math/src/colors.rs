@@ -24,10 +24,6 @@ pub type Colorf = Color<f32>;
 #[inline(always)]
 pub const fn color<T>(r: T, g: T, b: T, a: T) -> Color<T> { Color { r, g, b, a } }
 
-#[cfg(not(feature = "const_fn"))]
-#[inline]
-pub fn colorn<T: Copy>(n: T, a: T) -> Color<T> { Color { r: n, g: n, b: n, a } }
-#[cfg(feature = "const_fn")]
 #[inline]
 pub const fn colorn<T: Copy>(n: T, a: T) -> Color<T> { Color { r: n, g: n, b: n, a } }
 

@@ -71,10 +71,6 @@ macro_rules! impl_vec_shorthands {
     #[inline(always)]
     pub const fn $shorthand_name<T>($($field: T),+) -> $VecTy<T> { $VecTy { $($field),+ } }
 
-    #[cfg(not(feature = "const_fn"))]
-    #[inline(always)]
-    pub fn $n_shorthand_name<T: Copy>(n: T) -> $VecTy<T> { $VecTy { $($field: n),+ } }
-    #[cfg(feature = "const_fn")]
     #[inline(always)]
     pub const fn $n_shorthand_name<T: Copy>(n: T) -> $VecTy<T> { $VecTy { $($field: n),+ } }
   };
